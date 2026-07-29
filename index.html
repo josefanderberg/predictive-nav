@@ -158,17 +158,22 @@
       </p>
 
       <div class="actions">
-        <a class="btn primary" href="extension/newtab.html">Try it</a>
-        <a class="btn" href="extension/newtab.html?demo=1">Watch it without leaving</a>
+        <a
+          class="btn primary"
+          href="https://github.com/josefanderberg/predictive-nav/releases/latest/download/predictive-nav-extension.zip"
+          >Download the extension</a
+        >
+        <a class="btn" href="extension/newtab.html">Try the bar here</a>
         <a class="btn" href="https://github.com/josefanderberg/predictive-nav">Source on GitHub</a>
       </div>
 
       <p class="note">
-        <strong>Try it</strong> navigates for real — type <code>am</code> and you land on
-        Amazon. <strong>Watch it</strong> adds <code>?demo=1</code>, which replaces every
-        navigation with a banner so you can see the decision without being taken away.
-        The arrival overlay only exists in the installed extension: a web page cannot
-        draw on another site.
+        <strong>This page is not the extension.</strong> It is a description of one, plus
+        a working copy of the search bar you can type into. The parts that act on other
+        sites — the arrival overlay and the in-site search auto-pick — can only run once
+        the extension is installed, because a web page is not allowed to draw on or click
+        inside another site. Download it above, then follow
+        <a href="#install">Install it</a>.
       </p>
 
       <h2>What it does</h2>
@@ -223,16 +228,29 @@
         Eighteen sensitive hosts are excluded from the content script at build time.
       </p>
 
-      <h2>Install it</h2>
+      <h2 id="install">Install it</h2>
       <ol>
-        <li>Clone or download the repository.</li>
-        <li>Open <code>chrome://extensions</code> and turn on <strong>Developer mode</strong>.</li>
-        <li>Click <strong>Load unpacked</strong> and pick the <code>extension/</code> folder — or just drag the folder onto the page.</li>
-        <li>Open a new tab and type <code>blo</code>.</li>
+        <li>
+          <a
+            href="https://github.com/josefanderberg/predictive-nav/releases/latest/download/predictive-nav-extension.zip"
+            >Download the zip</a
+          >
+          and unzip it. You get a folder called <code>extension</code>.
+        </li>
+        <li>Open <code>chrome://extensions</code>.</li>
+        <li>
+          Turn on <strong>Developer mode</strong>, top right. The load button stays hidden
+          until you do — this is the step people miss.
+        </li>
+        <li>
+          Click <strong>Load unpacked</strong> and select the <code>extension</code>
+          folder itself, not a file inside it. Dragging the folder onto the page works too.
+        </li>
+        <li>Open a new tab with <kbd>⌘T</kbd> and type <code>bl</code> — no clicking first.</li>
       </ol>
       <p>
-        The in-site overlay and search auto-pick need the installed extension — a web page
-        cannot draw on another site. The demo above covers the New Tab bar only.
+        Editing the files later? Press the ↻ icon on the extension's card to pick the
+        changes up.
       </p>
 
       <h2>Run it locally</h2>
