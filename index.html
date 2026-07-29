@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Predictive Nav — navigate before you press Enter</title>
+    <meta
+      name="description"
+      content="A Chrome extension that predicts the site you are typing and navigates before you press Enter."
+    />
+    <style>
+      :root {
+        --bg: #0f1115;
+        --surface: #1a1e26;
+        --text: #e8eaf0;
+        --text-dim: #8a90a0;
+        --accent: #4f8cff;
+        --border: #262b36;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f5f6f8;
+          --surface: #fff;
+          --text: #1a1e26;
+          --text-dim: #6a7080;
+          --border: #e2e5ea;
+        }
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 4rem 1.5rem 6rem;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+      }
+      .eyebrow {
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+      h1 {
+        font-size: clamp(1.9rem, 5vw, 2.7rem);
+        line-height: 1.15;
+        margin: 0.6rem 0 1rem;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        font-size: 1.15rem;
+        color: var(--text-dim);
+        max-width: 34rem;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 3rem 0 0.8rem;
+      }
+      p + p {
+        margin-top: 0.9rem;
+      }
+      a {
+        color: var(--accent);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 2rem;
+      }
+      .btn {
+        display: inline-block;
+        padding: 0.7rem 1.2rem;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 500;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+        font-size: 0.95rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.55rem 0.7rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        color: var(--text-dim);
+        font-weight: 500;
+        font-size: 0.85rem;
+      }
+      code,
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.9em;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 0.1em 0.4em;
+      }
+      pre {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem;
+        overflow-x: auto;
+        margin-top: 0.8rem;
+      }
+      pre code {
+        background: none;
+        border: 0;
+        padding: 0;
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding-left: 1rem;
+        color: var(--text-dim);
+        margin-top: 1rem;
+      }
+      ol {
+        padding-left: 1.3rem;
+      }
+      li + li {
+        margin-top: 0.4rem;
+      }
+      footer {
+        margin-top: 4rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        color: var(--text-dim);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Predictive Nav</p>
+      <h1>Navigate before you press Enter.</h1>
+      <p class="lede">
+        A Chrome extension that replaces the New Tab page with a bar that acts on what
+        you are typing. Type <code>blo</code> and it goes to blocket.se — no Enter.
+      </p>
+
+      <div class="actions">
+        <a class="btn primary" href="extension/newtab.html?demo=1">Try the demo</a>
+        <a class="btn" href="https://github.com/josefanderberg/predictive-nav">Source on GitHub</a>
+      </div>
+
+      <p class="note">
+        The demo simulates navigation with a banner instead of leaving the page, so you
+        can watch what it would do. Drop the <code>?demo=1</code> to let it navigate for
+        real.
+      </p>
+
+      <h2>What it does</h2>
+      <p>Every keystroke resolves to exactly one intent:</p>
+      <table>
+        <tr>
+          <th>You type</th>
+          <th>Intent</th>
+          <th>What happens</th>
+        </tr>
+        <tr>
+          <td><code>blo</code></td>
+          <td>site</td>
+          <td>160-site catalog matches <em>blocket</em> → goes to blocket.se</td>
+        </tr>
+        <tr>
+          <td><code>hemnet.se</code></td>
+          <td>address</td>
+          <td>recognised as a URL → goes there directly</td>
+        </tr>
+        <tr>
+          <td><code>teknik</code></td>
+          <td>search</td>
+          <td>no site matches → jumps to the first organic result, past the ads</td>
+        </tr>
+        <tr>
+          <td><code>sv</code></td>
+          <td>ambiguous</td>
+          <td>four sites match → shows a list, navigates nowhere</td>
+        </tr>
+      </table>
+
+      <h2>Being wrong has to be cheap</h2>
+      <p>
+        Auto-navigation is only worth it if a bad guess costs nothing. So it only fires
+        when the top candidate holds at least 75% of the matched score and beats the
+        runner-up by 1.5×; <kbd>Esc</kbd> pauses it; and on arrival the destination shows
+        a five-second overlay with the runners-up and a search row, so switching is one
+        click rather than a back-button round trip.
+      </p>
+
+      <h2>Inside the sites</h2>
+      <p>
+        On catalog sites it also reads the site's <em>own</em> autocomplete and activates
+        the top row: type <code>mac</code> on Foodora and it opens McDonald's; on
+        Elgiganten it opens the MacBook results. It never guesses what "mac" means — the
+        site already knows, and its suggestion list is standard
+        <code>role="listbox"</code> markup, shadow DOM included.
+      </p>
+      <p>
+        It never runs on banks, government services, health, payment or checkout pages.
+        Eighteen sensitive hosts are excluded from the content script at build time.
+      </p>
+
+      <h2>Install it</h2>
+      <ol>
+        <li>Clone or download the repository.</li>
+        <li>Open <code>chrome://extensions</code> and turn on <strong>Developer mode</strong>.</li>
+        <li>Click <strong>Load unpacked</strong> and pick the <code>extension/</code> folder — or just drag the folder onto the page.</li>
+        <li>Open a new tab and type <code>blo</code>.</li>
+      </ol>
+      <p>
+        The in-site overlay and search auto-pick need the installed extension — a web page
+        cannot draw on another site. The demo above covers the New Tab bar only.
+      </p>
+
+      <h2>Run it locally</h2>
+      <pre><code>node tools/serve.mjs
+node --test test/*.test.mjs</code></pre>
+
+      <h2>Honest numbers</h2>
+      <p>
+        Chrome already prerenders its address-bar predictions, so what this removes is
+        roughly 200–400 ms per navigation. At about 3 seconds to recover from a wrong
+        guess, it has to be right well above 90% of the time to break even — which is
+        exactly why the confidence thresholds, the <kbd>Esc</kbd> key and the
+        second-chance overlay exist. As a mass-market product the gap this fills exists
+        on purpose. As a personal tool over your own twenty sites, the accuracy is high
+        enough that it pays for itself.
+      </p>
+
+      <footer>
+        No frameworks, no build step, no tracking. Favicons load from each site's own
+        origin. 60 unit tests.
+      </footer>
+    </main>
+  </body>
+</html>
