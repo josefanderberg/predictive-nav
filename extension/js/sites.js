@@ -33,6 +33,14 @@ export const SEED_SITES = [
   { name: "figma", url: "https://www.figma.com", weight: 42, category: "productivity" },
   { name: "canva", url: "https://www.canva.com", weight: 42, category: "productivity" },
   { name: "wikipedia", url: "https://sv.wikipedia.org", weight: 72, category: "productivity" },
+  { name: "docs", url: "https://docs.google.com", weight: 52, category: "productivity" },
+  { name: "photos", url: "https://photos.google.com", weight: 44, category: "productivity" },
+  { name: "icloud", url: "https://www.icloud.com", weight: 52, category: "productivity" },
+  { name: "apple", url: "https://www.apple.com/se/", weight: 60, category: "productivity" },
+  { name: "microsoft", url: "https://www.microsoft.com", weight: 50, category: "productivity" },
+  { name: "samsung", url: "https://www.samsung.com/se/", weight: 44, category: "shopping" },
+  { name: "duolingo", url: "https://www.duolingo.com", weight: 46, category: "productivity" },
+  { name: "trello", url: "https://trello.com", weight: 33, category: "productivity" },
 
   // --- social & messaging -------------------------------------------------
   { name: "facebook", url: "https://www.facebook.com", weight: 85, category: "social" },
@@ -152,6 +160,31 @@ export const SEED_SITES = [
   { name: "trafikverket", url: "https://www.trafikverket.se", weight: 44, category: "public" },
   { name: "ticketmaster", url: "https://www.ticketmaster.se", weight: 42, category: "streaming" },
   { name: "wolt", url: "https://wolt.com/sv", weight: 48, category: "grocery" },
+  { name: "ubereats", url: "https://www.ubereats.com/se", weight: 34, category: "grocery" },
+  { name: "bahnhof", url: "https://bahnhof.se", weight: 36, category: "telecom" },
+  { name: "bookbeat", url: "https://www.bookbeat.com", weight: 30, category: "books" },
+  { name: "sydsvenskan", url: "https://www.sydsvenskan.se", weight: 34, category: "news" },
+  { name: "filmstaden", url: "https://www.filmstaden.se", weight: 44, category: "streaming" },
+  { name: "discoveryplus", url: "https://www.discoveryplus.se", weight: 36, category: "streaming" },
+  { name: "atg", url: "https://www.atg.se", weight: 42, category: "gaming" },
+
+  // --- more Swedish retail ---------------------------------------------------
+  { name: "elon", url: "https://www.elon.se", weight: 40, category: "shopping-se" },
+  { name: "teknikmagasinet", url: "https://www.teknikmagasinet.se", weight: 32, category: "shopping-se" },
+  { name: "jollyroom", url: "https://www.jollyroom.se", weight: 40, category: "shopping-se" },
+  { name: "granngarden", url: "https://www.granngarden.se", weight: 36, category: "diy" },
+  { name: "zooplus", url: "https://www.zooplus.se", weight: 38, category: "shopping" },
+
+  // --- gyms, care & booking ---------------------------------------------------
+  { name: "sats", url: "https://www.sats.se", weight: 45, category: "fitness" },
+  { name: "nordicwellness", url: "https://nordicwellness.se", weight: 47, category: "fitness" },
+  { name: "fitness24seven", url: "https://se.fitness24seven.com", weight: 40, category: "fitness" },
+  { name: "actic", url: "https://www.actic.se", weight: 30, category: "fitness" },
+  { name: "bokadirekt", url: "https://www.bokadirekt.se", weight: 46, category: "fitness" },
+  { name: "apotekhjartat", url: "https://www.apotekhjartat.se", weight: 58, category: "health-beauty" },
+  { name: "meds", url: "https://www.meds.se", weight: 33, category: "health-beauty" },
+  { name: "doktor", url: "https://doktor.se", weight: 40, category: "health-beauty" },
+  { name: "mindoktor", url: "https://www.mindoktor.se", weight: 36, category: "health-beauty" },
 
   // --- global shopping ----------------------------------------------------
   {
@@ -192,6 +225,9 @@ export const SEED_SITES = [
   { name: "klarna", url: "https://www.klarna.com/se/", weight: 64, category: "finance" },
   { name: "folksam", url: "https://www.folksam.se", weight: 44, category: "finance" },
   { name: "trygghansa", url: "https://www.trygghansa.se", weight: 40, category: "finance" },
+  { name: "paypal", url: "https://www.paypal.com", weight: 54, category: "finance" },
+  { name: "revolut", url: "https://www.revolut.com", weight: 42, category: "finance" },
+  { name: "wise", url: "https://wise.com", weight: 36, category: "finance" },
 
   // --- government, health & public services -------------------------------
   { name: "skatteverket", url: "https://www.skatteverket.se", weight: 66, category: "public" },
@@ -240,6 +276,7 @@ export const SEED_SITES = [
   { name: "claude", url: "https://claude.ai", weight: 74, category: "dev" },
   { name: "gemini", url: "https://gemini.google.com", weight: 56, category: "dev" },
   { name: "npm", url: "https://www.npmjs.com", weight: 34, category: "dev" },
+  { name: "perplexity", url: "https://www.perplexity.ai", weight: 42, category: "dev" },
   { name: "vercel", url: "https://vercel.com", weight: 32, category: "dev" },
 
   // --- gaming ----------------------------------------------------------------

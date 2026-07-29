@@ -75,7 +75,7 @@ function sameDomain(a, b) {
  * move money or submit filings; a mis-click there is not a small cost.
  */
 const BLOCKED_HOST =
-  /(^|\.)(swedbank|seb|nordea|handelsbanken|lansforsakringar|folksam|trygghansa|if|lf|icabanken|avanza|nordnet|klarna|paypal|stripe|revolut|wise|coinbase|skatteverket|forsakringskassan|csn|arbetsformedlingen|polisen|migrationsverket|pensionsmyndigheten|transportstyrelsen|bolagsverket|domstol|1177|vardguiden|kry|mindoktor|doktor|apoteket|apotek|bankid|freja|kivra|minaintyg)\./i;
+  /(^|\.)(swedbank|seb|nordea|handelsbanken|lansforsakringar|folksam|trygghansa|if|lf|icabanken|avanza|nordnet|klarna|paypal|stripe|revolut|wise|coinbase|skatteverket|forsakringskassan|csn|arbetsformedlingen|polisen|migrationsverket|pensionsmyndigheten|transportstyrelsen|bolagsverket|domstol|1177|vardguiden|kry|mindoktor|doktor|apoteket|apotek|apotekhjartat|apohem|meds|bankid|freja|kivra|minaintyg)\./i;
 const BLOCKED_TLD = /\.(gov|bank)(\.|$)/i;
 const BLOCKED_PATH = /(checkout|kassa|payment|betal|order|bestall|login|logga-in|signin|account|konto|admin)/i;
 
