@@ -172,6 +172,7 @@ function resolveIntent(text) {
     return {
       type: "site",
       url,
+      site: prediction.site,
       status: `${url} — ${percent}% confident`,
       ghost: prediction.site.name,
       candidates: prediction.candidates.slice(0, MAX_SUGGESTIONS),
@@ -268,14 +269,28 @@ async function navigateTo(url, intent = null) {
  */
 function buildSwitchOffer(url, intent) {
   if (intent.type !== "site") return null;
-  // Offered even when nothing else matched the prefix: the search row alone
-  // is the escape hatch from a confident-but-wrong guess.
   return buildOffer({
     query: intent.query,
     chosenUrl: url,
     candidates: intent.runnersUp,
+    neighbours: neighboursOf(intent.site),
     now: Date.now(),
   });
+}
+
+/**
+ * The heaviest other sites in the same category, used to top the panel up when
+ * the typed prefix has no runners-up. "lidl" matches only Lidl, but the next
+ * thing you might want is another grocer, and offering nothing wastes the
+ * five seconds the panel is on screen.
+ */
+function neighboursOf(site) {
+  if (!site?.category) return [];
+  return state.sites
+    .filter((s) => s.category === site.category && s.name !== site.name)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, MAX_SUGGESTIONS)
+    .map((s) => ({ name: s.name, url: destinationOf(s) }));
 }
 
 /** Hand the offer to the destination page, which renders it on arrival. */

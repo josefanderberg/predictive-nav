@@ -207,11 +207,16 @@ const SEARCH_URL = "https://www.google.com/search?q=";
 
 /**
  * Build the record handed to the destination page.
- * `candidates` is the predictor's ranked list, best first.
+ *
+ * `candidates` is the predictor's ranked list, best first. `neighbours` are
+ * sites from the same category, used to fill the panel when the prefix has no
+ * runners-up: landing on Lidl, the useful next move is Willys or ICA, and an
+ * almost-empty panel is a wasted five seconds. Prefix matches always rank
+ * first — they are what you were actually typing.
  */
-function buildOffer({ query, chosenUrl, candidates, now }) {
+function buildOffer({ query, chosenUrl, candidates, neighbours = [], now }) {
   const alternatives = [];
-  for (const { name, url } of candidates) {
+  for (const { name, url } of [...candidates, ...neighbours]) {
     if (url === chosenUrl || alternatives.some((a) => a.url === url)) continue;
     alternatives.push({ name, url });
     if (alternatives.length === MAX_ALTERNATIVES) break;

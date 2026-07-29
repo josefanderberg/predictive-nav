@@ -113,6 +113,65 @@ test("garbage offers are rejected rather than rendered", () => {
   assert.ok(!isOfferValid({ createdAt: 0, alternatives: [], chosenUrl: "" }, "https://x.com", 0));
 });
 
+test("neighbours fill the panel when the prefix has no runners-up", () => {
+  // "lidl" matches only Lidl, so without neighbours the panel would be a
+  // single search row — five seconds of screen for almost nothing.
+  const offer = buildOffer({
+    query: "lidl",
+    chosenUrl: "https://www.lidl.se",
+    candidates: [{ name: "lidl", url: "https://www.lidl.se" }],
+    neighbours: [
+      { name: "ica", url: "https://www.ica.se" },
+      { name: "willys", url: "https://www.willys.se" },
+      { name: "coop", url: "https://www.coop.se" },
+      { name: "foodora", url: "https://www.foodora.se" },
+      { name: "mathem", url: "https://www.mathem.se" },
+    ],
+    now: 0,
+  });
+  assert.deepEqual(
+    offer.alternatives.map((a) => a.name),
+    ["ica", "willys", "coop", "foodora"]
+  );
+  assert.equal(offerRows(offer).length, 5, "four sites plus the search row");
+  assert.ok(offerRows(offer).every((r) => r.host), "every row needs a favicon host");
+});
+
+test("prefix matches always outrank neighbours", () => {
+  const offer = buildOffer({
+    query: "sv",
+    chosenUrl: "https://www.svt.se",
+    candidates: [
+      { name: "svt", url: "https://www.svt.se" },
+      { name: "svtplay", url: "https://www.svtplay.se" },
+      { name: "svd", url: "https://www.svd.se" },
+    ],
+    neighbours: [{ name: "aftonbladet", url: "https://www.aftonbladet.se" }],
+    now: 0,
+  });
+  assert.deepEqual(
+    offer.alternatives.map((a) => a.name),
+    ["svtplay", "svd", "aftonbladet"]
+  );
+});
+
+test("a neighbour duplicating the destination is not offered", () => {
+  const offer = buildOffer({
+    query: "x",
+    chosenUrl: "https://x.com",
+    candidates: [{ name: "x", url: "https://x.com" }],
+    neighbours: [
+      { name: "twitter", url: "https://x.com" }, // same destination
+      { name: "reddit", url: "https://www.reddit.com" },
+    ],
+    now: 0,
+  });
+  assert.deepEqual(
+    offer.alternatives.map((a) => a.name),
+    ["reddit"]
+  );
+});
+
 test("a guess with no runner-up still offers the search row", () => {
   const offer = buildOffer({
     query: "lin",
