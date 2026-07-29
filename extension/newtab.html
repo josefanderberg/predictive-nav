@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New Tab</title>
+    <link rel="stylesheet" href="css/newtab.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <h1 class="brand">Predictive Nav</h1>
+
+      <div class="bar">
+        <div class="ghost" id="ghost" aria-hidden="true"></div>
+        <input
+          id="nav-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Start typing a site or a search…"
+          aria-label="Type a site name or a search query"
+        />
+        <svg id="ring" class="ring" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="ring-track" cx="12" cy="12" r="9" />
+          <circle class="ring-fill" cx="12" cy="12" r="9" />
+        </svg>
+      </div>
+
+      <ul class="suggestions" id="suggestions"></ul>
+
+      <p class="status" id="status" role="status"></p>
+      <p class="hint">
+        Known sites go instantly · anything else jumps to the first result,
+        past the ads · <kbd>Esc</kbd> pauses · <kbd>Enter</kbd> goes now
+      </p>
+
+      <div class="banner" id="banner" role="alert"></div>
+
+      <p class="diagnostics" id="diagnostics"></p>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

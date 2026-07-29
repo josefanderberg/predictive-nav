@@ -1,0 +1,219 @@
+:root {
+  --bg: #0f1115;
+  --surface: #1a1e26;
+  --text: #e8eaf0;
+  --text-dim: #8a90a0;
+  --accent: #4f8cff;
+  --commit-ms: 450ms;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --text: #1a1e26;
+    --text-dim: #6a7080;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.stage {
+  width: min(640px, 90vw);
+  text-align: center;
+}
+
+.brand {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 2rem;
+}
+
+.bar {
+  position: relative;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.25);
+}
+
+.bar input,
+.ghost {
+  width: 100%;
+  padding: 1.1rem 3.2rem 1.1rem 1.4rem;
+  font-size: 1.5rem;
+  font-family: inherit;
+  text-align: left;
+}
+
+.bar input {
+  position: relative;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  color: var(--text);
+  outline: none;
+}
+
+.bar input:focus {
+  border-color: var(--accent);
+}
+
+.ghost {
+  position: absolute;
+  inset: 0;
+  color: var(--text-dim);
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.ring {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  translate: 0 -50%;
+  opacity: 0;
+}
+
+.ring.active {
+  opacity: 1;
+}
+
+.ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.ring-track {
+  stroke: var(--text-dim);
+  opacity: 0.3;
+}
+
+.ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 56.5; /* 2πr, r=9 */
+  stroke-dashoffset: 56.5;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.ring.active .ring-fill {
+  animation: fill-ring var(--commit-ms) linear forwards;
+}
+
+@keyframes fill-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.suggestions {
+  list-style: none;
+  margin-top: 0.8rem;
+  padding: 0;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.15);
+}
+
+.suggestions:empty {
+  display: none;
+}
+
+.suggestions li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.7rem 1.2rem;
+  cursor: pointer;
+}
+
+.suggestions li:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.suggestions li:first-child .s-name {
+  color: var(--accent);
+}
+
+.s-name {
+  font-weight: 600;
+}
+
+.s-url {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  margin-top: 1.2rem;
+  min-height: 1.4em;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+kbd {
+  padding: 0.1em 0.4em;
+  border: 1px solid var(--text-dim);
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.banner {
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.05rem;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.banner.visible {
+  opacity: 1;
+}
+
+/* Makes a silently-empty catalog or stale cached code visible instead of
+   looking like a dead page. */
+.diagnostics {
+  margin-top: 2rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.diagnostics.error {
+  color: #ff6b6b;
+  opacity: 1;
+}

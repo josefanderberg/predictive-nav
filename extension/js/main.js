@@ -1,0 +1,274 @@
+/**
+ * UI wiring for the predictive navigation bar.
+ *
+ * Every keystroke resolves the input to exactly one intent:
+ *
+ *   url    – you typed an address ("blocket.se")        -> go there
+ *   site   – a known site matched confidently            -> go there
+ *   lucky  – nothing matched, so jump to the first        -> go there
+ *            organic search result (skipping the ads)
+ *   none   – too little to act on                        -> wait
+ *
+ * An intent with a `delay` auto-navigates after that many ms of typing
+ * silence. More typing resets the timer, Escape cancels auto-navigation for
+ * the rest of the input, Enter commits immediately.
+ *
+ * Demo mode (?demo=1): shows a "would navigate to …" banner instead of
+ * actually leaving the page, so the behavior can be tested on a plain server.
+ */
+import { predict } from "./predictor.js";
+import { resolveRegionalUrl } from "./sites.js";
+import { loadSites } from "./user-sites.js";
+import { PROVIDERS, looksLikeUrl, toDirectUrl } from "./lucky.js";
+import { buildOffer, offerRows } from "./switcher.js";
+import { renderOfferPanel } from "./offer-panel.js";
+
+/** Which search engine backs the "first result" jump. See lucky.js. */
+const PROVIDER = PROVIDERS.duckduckgo;
+/** Set false to require Enter for search fallbacks (known sites still auto-go). */
+const AUTO_LUCKY = true;
+
+const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
+const LUCKY_DELAY_MS = 900; // search fallback: riskier, leave room to keep typing
+const MIN_LUCKY_LENGTH = 3;
+const MAX_SUGGESTIONS = 5;
+
+const els = {
+  input: document.getElementById("nav-input"),
+  ghost: document.getElementById("ghost"),
+  status: document.getElementById("status"),
+  ring: document.getElementById("ring"),
+  banner: document.getElementById("banner"),
+  suggestions: document.getElementById("suggestions"),
+  diagnostics: document.getElementById("diagnostics"),
+};
+
+const state = {
+  sites: [],
+  timer: null,
+  suppressed: false,
+  intent: null,
+};
+
+const DEMO_MODE = new URLSearchParams(location.search).has("demo");
+
+init();
+
+async function init() {
+  // Listeners first, unconditionally: even if personalization fails, the bar
+  // must keep working (Enter falls back to search on an empty catalog).
+  els.input.addEventListener("input", onInput);
+  els.input.addEventListener("keydown", onKeyDown);
+  els.input.focus();
+  if (DEMO_MODE) setStatus("Demo mode: navigation is simulated.");
+
+  allowContentScriptsToReadOffers();
+
+  try {
+    state.sites = await loadSites();
+  } catch {
+    const { SEED_SITES } = await import("./sites.js");
+    state.sites = SEED_SITES;
+  }
+  onInput(); // re-evaluate anything typed while the catalog loaded
+}
+
+/**
+ * chrome.storage.session is walled off from content scripts by default; the
+ * second-chance panel runs in one. This page is a trusted context, so it can
+ * open session storage up before any offer is written.
+ */
+function allowContentScriptsToReadOffers() {
+  try {
+    chrome?.storage?.session
+      ?.setAccessLevel?.({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
+      ?.catch(() => {});
+  } catch {
+    // not running as an extension — nothing to do
+  }
+}
+
+// --- intent resolution --------------------------------------------------
+
+function resolveIntent(text) {
+  const query = text.trim();
+  if (!query) return null;
+
+  if (looksLikeUrl(query)) {
+    const url = toDirectUrl(query);
+    return { type: "url", url, status: `${url} — typed address`, candidates: [], delay: COMMIT_DELAY_MS };
+  }
+
+  const prediction = predict(query, state.sites);
+  if (prediction.kind !== "none") {
+    const url = destinationOf(prediction.site);
+    const percent = Math.round(prediction.confidence * 100);
+    return {
+      type: "site",
+      url,
+      status: `${url} — ${percent}% confident`,
+      ghost: prediction.site.name,
+      candidates: prediction.candidates.slice(0, MAX_SUGGESTIONS),
+      runnersUp: prediction.candidates.map((c) => ({
+        name: c.site.name,
+        url: destinationOf(c.site),
+      })),
+      query,
+      delay: prediction.kind === "commit" ? COMMIT_DELAY_MS : null,
+    };
+  }
+
+  if (query.length < MIN_LUCKY_LENGTH) {
+    return { type: "none", url: null, status: "Keep typing…", candidates: [], delay: null };
+  }
+
+  return {
+    type: "lucky",
+    url: PROVIDER.lucky(query),
+    status: `First result for “${query}” — skips the ads · ${PROVIDER.label}`,
+    candidates: [],
+    delay: AUTO_LUCKY ? LUCKY_DELAY_MS : null,
+  };
+}
+
+// --- events -------------------------------------------------------------
+
+function onInput() {
+  cancelPendingCommit();
+  hideBanner();
+
+  const intent = resolveIntent(els.input.value);
+  if (!intent) {
+    state.suppressed = false;
+    render(null);
+    return;
+  }
+
+  render(intent);
+  if (intent.delay !== null && !state.suppressed) scheduleCommit(intent);
+}
+
+function onKeyDown(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    // Pass the intent along: committing by hand is still a guess, so the
+    // destination should offer the same second chance as an automatic one.
+    const intent = state.intent ?? resolveIntent(els.input.value);
+    if (intent?.url) navigateTo(intent.url, intent);
+    else if (els.input.value.trim()) navigateTo(PROVIDER.search(els.input.value.trim()));
+  } else if (event.key === "Escape") {
+    cancelPendingCommit();
+    state.suppressed = true;
+    setStatus("Auto-navigation paused — press Enter to go.");
+  }
+}
+
+// --- commit timing ------------------------------------------------------
+
+function scheduleCommit(intent) {
+  state.intent = intent;
+  els.ring.style.setProperty("--commit-ms", `${intent.delay}ms`);
+  els.ring.classList.add("active");
+  state.timer = setTimeout(() => navigateTo(intent.url, intent), intent.delay);
+}
+
+function cancelPendingCommit() {
+  clearTimeout(state.timer);
+  state.timer = null;
+  state.intent = null;
+  els.ring.classList.remove("active");
+}
+
+async function navigateTo(url, intent = null) {
+  cancelPendingCommit();
+  const offer = intent ? buildSwitchOffer(url, intent) : null;
+
+  if (DEMO_MODE) {
+    showBanner(`Would navigate to ${url}`);
+    // The real panel lives on the destination page, which demo mode never
+    // reaches — so preview it here, using the same renderer and rows.
+    if (offer) {
+      renderOfferPanel({
+        rows: offerRows(offer),
+        title: "On the destination you would see",
+        onPick: (row) => showBanner(`Would navigate to ${row.url}`),
+      });
+    }
+    return;
+  }
+
+  if (offer) await storeSwitchOffer(offer);
+  location.assign(url);
+}
+
+/**
+ * The runners-up worth offering as a one-click switch. Only for site guesses —
+ * a typed address is not a guess, and a search fallback has no runners-up.
+ */
+function buildSwitchOffer(url, intent) {
+  if (intent.type !== "site") return null;
+  // Offered even when nothing else matched the prefix: the search row alone
+  // is the escape hatch from a confident-but-wrong guess.
+  return buildOffer({
+    query: intent.query,
+    chosenUrl: url,
+    candidates: intent.runnersUp,
+    now: Date.now(),
+  });
+}
+
+/** Hand the offer to the destination page, which renders it on arrival. */
+async function storeSwitchOffer(offer) {
+  try {
+    await chrome?.storage?.session?.set({ switchOffer: offer });
+  } catch {
+    // storage is best-effort; never block navigation on it
+  }
+}
+
+function destinationOf(site) {
+  return resolveRegionalUrl(site, navigator.language);
+}
+
+// --- rendering ----------------------------------------------------------
+
+function render(intent) {
+  const typed = els.input.value;
+  const name = intent?.ghost ?? "";
+  const completion = name.startsWith(typed.trim().toLowerCase())
+    ? name.slice(typed.trim().length)
+    : "";
+  els.ghost.textContent = typed + completion;
+  setStatus(intent?.status ?? "");
+  renderSuggestions(intent?.candidates ?? []);
+}
+
+function setStatus(text) {
+  els.status.textContent = text;
+}
+
+function renderSuggestions(candidates) {
+  els.suggestions.replaceChildren(
+    ...candidates.map(({ site }) => {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.className = "s-name";
+      name.textContent = site.name;
+      const url = document.createElement("span");
+      url.className = "s-url";
+      url.textContent = destinationOf(site);
+      li.append(name, url);
+      li.addEventListener("click", () => navigateTo(destinationOf(site)));
+      return li;
+    })
+  );
+}
+
+function showBanner(text) {
+  els.banner.textContent = text;
+  els.banner.classList.add("visible");
+}
+
+function hideBanner() {
+  els.banner.classList.remove("visible");
+}
