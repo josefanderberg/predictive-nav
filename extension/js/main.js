@@ -65,7 +65,7 @@ async function init() {
   // must keep working (Enter falls back to search on an empty catalog).
   els.input.addEventListener("input", onInput);
   els.input.addEventListener("keydown", onKeyDown);
-  els.input.focus();
+  claimFocus();
   if (DEMO_MODE) setStatus("Demo mode: navigation is simulated.");
   renderDiagnostics();
 
@@ -79,6 +79,36 @@ async function init() {
   }
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
+}
+
+/**
+ * Get the caret into the bar so the first thing typed is a destination, not a
+ * lost keystroke.
+ *
+ * Chrome parks focus in the address bar when a new tab opens and can take it
+ * back after the page paints, so one focus() call during load loses the race.
+ * We ask repeatedly for a moment, again whenever the tab is shown, and treat
+ * any printable key pressed elsewhere on the page as meant for the bar.
+ *
+ * The honest limit: keystrokes that go to the address bar never reach this
+ * page at all, so nothing here can recover them.
+ */
+function claimFocus() {
+  const focus = () => {
+    if (document.activeElement !== els.input) els.input.focus({ preventScroll: true });
+  };
+
+  focus();
+  for (const delay of [0, 30, 100, 250, 500]) setTimeout(focus, delay);
+  document.addEventListener("visibilitychange", () => !document.hidden && focus());
+  window.addEventListener("focus", focus);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.target === els.input) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key.length !== 1) return; // ignore Tab, arrows, F-keys and friends
+    focus();
+  });
 }
 
 /**

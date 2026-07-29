@@ -22,11 +22,11 @@
 (async () => {
   if (isSensitiveLocation(location)) return;
 
-  // The panel must never take the search watcher down with it: session
-  // storage is walled off from content scripts unless the new tab page has
-  // opened it up, and that call may not have happened yet.
-  await showSecondChancePanel().catch(() => {});
+  // Watch the search box first and synchronously. The panel has to await a
+  // storage read, and anything typed before that resolves would go unseen —
+  // besides, a failure in the panel must never take the watcher down with it.
   watchSiteSearch();
+  showSecondChancePanel().catch(() => {});
 
   // --- 1. second-chance panel -------------------------------------------
 
