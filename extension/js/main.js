@@ -20,8 +20,7 @@ import { predict } from "./predictor.js";
 import { resolveRegionalUrl } from "./sites.js";
 import { loadSites } from "./user-sites.js";
 import { PROVIDERS, looksLikeUrl, toDirectUrl } from "./lucky.js";
-import { buildOffer, offerRows } from "./switcher.js";
-import { renderOfferPanel } from "./offer-panel.js";
+import { buildOffer } from "./switcher.js";
 
 /** Which search engine backs the "first result" jump. See lucky.js. */
 const PROVIDER = PROVIDERS.duckduckgo;
@@ -226,15 +225,6 @@ async function navigateTo(url, intent = null) {
 
   if (DEMO_MODE) {
     showBanner(url);
-    // The real panel lives on the destination page, which demo mode never
-    // reaches — so preview it here, using the same renderer and rows.
-    if (offer) {
-      renderOfferPanel({
-        rows: offerRows(offer),
-        title: "On the destination you would see",
-        onPick: (row) => showBanner(row.url),
-      });
-    }
     return;
   }
 
