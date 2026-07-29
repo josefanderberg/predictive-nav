@@ -61,6 +61,7 @@ async function init() {
   els.input.addEventListener("keydown", onKeyDown);
   els.input.focus();
   if (DEMO_MODE) setStatus("Demo mode: navigation is simulated.");
+  renderDiagnostics();
 
   allowContentScriptsToReadOffers();
 
@@ -70,7 +71,36 @@ async function init() {
     const { SEED_SITES } = await import("./sites.js");
     state.sites = SEED_SITES;
   }
+  renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
+}
+
+/**
+ * States which of the three contexts this page is running in.
+ *
+ * They behave differently in ways that otherwise look like bugs: served as an
+ * ordinary web page there is no extension storage, so the destination overlay
+ * cannot appear no matter how well everything else works — and in demo mode
+ * nothing navigates at all. Saying so beats leaving it to be discovered.
+ */
+function renderDiagnostics() {
+  const isExtension = location.protocol === "chrome-extension:";
+  const parts = [`${state.sites.length} sites`];
+
+  if (DEMO_MODE) parts.push("demo mode — nothing actually navigates");
+  else if (!isExtension) parts.push("web page — navigates, but the destination overlay needs the installed extension");
+  else parts.push("running as the extension — all features active");
+
+  els.diagnostics.replaceChildren(document.createTextNode(parts.join(" · ")));
+  els.diagnostics.classList.toggle("error", !isExtension && !DEMO_MODE);
+
+  if (!DEMO_MODE) return;
+  const real = new URL(location.href);
+  real.searchParams.delete("demo");
+  const link = document.createElement("a");
+  link.href = real.href;
+  link.textContent = "turn demo off";
+  els.diagnostics.append(document.createTextNode(" · "), link);
 }
 
 /**
@@ -184,14 +214,14 @@ async function navigateTo(url, intent = null) {
   const offer = intent ? buildSwitchOffer(url, intent) : null;
 
   if (DEMO_MODE) {
-    showBanner(`Would navigate to ${url}`);
+    showBanner(url);
     // The real panel lives on the destination page, which demo mode never
     // reaches — so preview it here, using the same renderer and rows.
     if (offer) {
       renderOfferPanel({
         rows: offerRows(offer),
         title: "On the destination you would see",
-        onPick: (row) => showBanner(`Would navigate to ${row.url}`),
+        onPick: (row) => showBanner(row.url),
       });
     }
     return;
@@ -264,8 +294,21 @@ function renderSuggestions(candidates) {
   );
 }
 
-function showBanner(text) {
-  els.banner.textContent = text;
+/**
+ * Demo mode's whole point is to not navigate, which reads as "broken" unless
+ * the banner says so and offers the way out. So it names the mode and links to
+ * the destination, making the simulated hop one click from the real one.
+ */
+function showBanner(url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.textContent = url;
+
+  const hint = document.createElement("span");
+  hint.className = "banner-hint";
+  hint.textContent = "Simulated — click the link to go there for real";
+
+  els.banner.replaceChildren(document.createTextNode("Would navigate to "), link, hint);
   els.banner.classList.add("visible");
 }
 

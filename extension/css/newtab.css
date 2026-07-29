@@ -214,6 +214,18 @@ kbd {
 }
 
 .diagnostics.error {
-  color: #ff6b6b;
+  color: #ffb454;
   opacity: 1;
+}
+
+.diagnostics a,
+.banner a {
+  color: inherit;
+}
+
+.banner-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  opacity: 0.85;
 }
