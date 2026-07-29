@@ -18,7 +18,8 @@
  * regardless of markup. Banking, government, health and payment flows can
  * move money or submit filings; a mis-click there is not a small cost.
  */
-const BLOCKED_HOST = /(^|\.)(swedbank|seb|nordea|handelsbanken|lansforsakringar|avanza|nordnet|klarna|paypal|stripe|revolut|skatteverket|forsakringskassan|csn|arbetsformedlingen|polisen|migrationsverket|pensionsmyndigheten|1177|bankid|kivra)\./i;
+const BLOCKED_HOST =
+  /(^|\.)(swedbank|seb|nordea|handelsbanken|lansforsakringar|folksam|trygghansa|if|lf|icabanken|avanza|nordnet|klarna|paypal|stripe|revolut|wise|coinbase|skatteverket|forsakringskassan|csn|arbetsformedlingen|polisen|migrationsverket|pensionsmyndigheten|transportstyrelsen|bolagsverket|domstol|1177|vardguiden|kry|mindoktor|doktor|apoteket|apotek|bankid|freja|kivra|minaintyg)\./i;
 const BLOCKED_TLD = /\.(gov|bank)(\.|$)/i;
 const BLOCKED_PATH = /(checkout|kassa|payment|betal|order|bestall|login|logga-in|signin|account|konto|admin)/i;
 

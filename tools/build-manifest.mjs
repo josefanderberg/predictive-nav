@@ -13,28 +13,33 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SEED_SITES } from "../extension/js/sites.js";
 import { isSensitiveLocation } from "../extension/js/site-search.js";
+import { registrableDomain } from "../extension/js/domain.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = join(root, "extension", "manifest.json");
 
+// Patterns are built from the registrable domain, not the exact host. A seed
+// entry on a subdomain (www2.hm.com, open.spotify.com) would otherwise emit a
+// pattern that misses its own siblings — so landing on www.hm.com after a
+// redirect, or on the variant the user actually visits, would get no content
+// script and no overlay, silently.
 const hosts = new Set();
 for (const site of SEED_SITES) {
   for (const url of [site.url, ...Object.values(site.regional ?? {})]) {
-    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    const hostname = new URL(url).hostname;
     if (isSensitiveLocation({ hostname, pathname: "/" })) continue;
-    hosts.add(hostname);
+    hosts.add(registrableDomain(hostname));
   }
 }
 
 const matches = [...hosts].sort().map((host) => `https://*.${host}/*`);
 
-/** Every module content.js pulls in dynamically must be reachable from the page. */
-const SHARED_MODULES = ["js/site-search.js", "js/switcher.js", "js/offer-panel.js"];
-
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 manifest.content_scripts[0].matches = matches;
-manifest.web_accessible_resources[0].resources = SHARED_MODULES;
-manifest.web_accessible_resources[0].matches = matches;
+manifest.content_scripts[0].js = ["js/content.bundle.js"];
+// Nothing is fetched at runtime any more — the bundle carries its modules —
+// so the extension exposes no resources to pages at all.
+delete manifest.web_accessible_resources;
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 const skipped = new Set();

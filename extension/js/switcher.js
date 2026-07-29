@@ -10,6 +10,7 @@
  * The last row is always a plain web search, because sometimes none of the
  * guesses were right.
  */
+import { sameDomain } from "./domain.js";
 
 /** How long an offer stays valid. Covers page load, not much more. */
 export const OFFER_TTL_MS = 12_000;
@@ -51,7 +52,10 @@ export function isOfferValid(offer, currentUrl, now) {
   if (!offer || typeof offer.createdAt !== "number") return false;
   if (!Array.isArray(offer.alternatives) || typeof offer.query !== "string") return false;
   if (now - offer.createdAt > OFFER_TTL_MS) return false;
-  return sameSite(offer.chosenUrl, currentUrl);
+  // Registrable domain, not exact host: sites routinely bounce you to another
+  // host they own on the way in (hm.com -> www2.hm.com), and an exact compare
+  // would silently void the offer exactly when it landed successfully.
+  return sameDomain(offer.chosenUrl, currentUrl);
 }
 
 /** The rows to render: the alternatives, then always a search escape hatch. */
@@ -71,13 +75,6 @@ export function offerRows(offer) {
       host: hostOf(offer.searchUrl),
     },
   ];
-}
-
-/** Same registrable-ish host, ignoring a leading www. */
-function sameSite(a, b) {
-  const left = hostOf(a);
-  const right = hostOf(b);
-  return left !== null && left === right;
 }
 
 function hostOf(url) {

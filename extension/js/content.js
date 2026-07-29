@@ -14,22 +14,12 @@
  * health, payment or checkout pages; always shows a visible countdown that
  * Escape cancels.
  *
- * Content scripts cannot use static ESM imports, hence the dynamic imports of
- * the shared modules (declared in web_accessible_resources).
+ * This file is never loaded on its own. tools/build-content.mjs concatenates
+ * it with the modules it uses into js/content.bundle.js, which is what the
+ * manifest injects — a runtime import() here would be evaluated against the
+ * host page's CSP and blocked outright on strict sites.
  */
 (async () => {
-  const load = (file) => import(chrome.runtime.getURL(file));
-  const [siteSearch, switcher, panel] = await Promise.all([
-    load("js/site-search.js"),
-    load("js/switcher.js"),
-    load("js/offer-panel.js"),
-  ]);
-
-  const { isSensitiveLocation, isSearchInput, findSuggestions, chooseSuggestion, activationTarget } =
-    siteSearch;
-  const { isOfferValid, offerRows, OFFER_VISIBLE_MS } = switcher;
-  const { renderOfferPanel } = panel;
-
   if (isSensitiveLocation(location)) return;
 
   // The panel must never take the search watcher down with it: session

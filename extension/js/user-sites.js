@@ -7,6 +7,7 @@
  * seed list unchanged when chrome.topSites is unavailable.
  */
 import { SEED_SITES } from "./sites.js";
+import { sameDomain } from "./domain.js";
 
 const TOP_SITE_BONUS = 40;
 
@@ -22,7 +23,11 @@ export async function loadSites() {
     const existing = merged.get(name);
     if (existing) {
       existing.weight += TOP_SITE_BONUS;
-      existing.url = url; // prefer the variant the user actually visits
+      // Adopt the variant the user actually visits, but only within the same
+      // registrable domain. Letting a top site move "hm" from www2.hm.com to a
+      // host outside the catalog's own domain would send you somewhere the
+      // content script was never registered for.
+      if (sameDomain(existing.url, url)) existing.url = url;
     } else {
       merged.set(name, { name, url, weight: TOP_SITE_BONUS });
     }

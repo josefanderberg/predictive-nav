@@ -29,6 +29,13 @@ const PROVIDER = PROVIDERS.duckduckgo;
 const AUTO_LUCKY = true;
 
 const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
+/**
+ * When exactly one site matches, typing more of the same name cannot change
+ * the answer — "am", "ama", "amazon" all end at Amazon — so there is nothing
+ * to wait for. Guessing early is only wrong if you meant a site the catalog
+ * has never heard of, which is what Esc and the arrival overlay are for.
+ */
+const SOLE_MATCH_DELAY_MS = 200;
 const LUCKY_DELAY_MS = 900; // search fallback: riskier, leave room to keep typing
 const MIN_LUCKY_LENGTH = 3;
 const MAX_SUGGESTIONS = 5;
@@ -144,7 +151,11 @@ function resolveIntent(text) {
         url: destinationOf(c.site),
       })),
       query,
-      delay: prediction.kind === "commit" ? COMMIT_DELAY_MS : null,
+      delay: prediction.kind !== "commit"
+        ? null
+        : prediction.candidates.length === 1
+          ? SOLE_MATCH_DELAY_MS
+          : COMMIT_DELAY_MS,
     };
   }
 
