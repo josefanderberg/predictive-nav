@@ -196,6 +196,7 @@ function resolveIntent(text) {
   return {
     type: "lucky",
     url: PROVIDER.lucky(query),
+    query,
     status: `First result for “${query}” — skips the ads · ${PROVIDER.label}`,
     candidates: [],
     delay: AUTO_LUCKY ? LUCKY_DELAY_MS : null,
@@ -268,14 +269,32 @@ async function navigateTo(url, intent = null) {
  * a typed address is not a guess, and a search fallback has no runners-up.
  */
 function buildSwitchOffer(url, intent) {
-  if (intent.type !== "site") return null;
-  return buildOffer({
-    query: intent.query,
-    chosenUrl: url,
-    candidates: intent.runnersUp,
-    neighbours: neighboursOf(intent.site),
-    now: Date.now(),
-  });
+  if (intent.type === "site") {
+    return buildOffer({
+      kind: "site",
+      query: intent.query,
+      chosenUrl: url,
+      candidates: intent.runnersUp,
+      neighbours: neighboursOf(intent.site),
+      now: Date.now(),
+    });
+  }
+
+  // A search jump lands wherever the engine decides, so there is no
+  // destination to record and no runners-up to rank — but it is the least
+  // certain navigation of the lot, so the way back matters more here, not less.
+  if (intent.type === "lucky") {
+    return buildOffer({
+      kind: "search",
+      query: intent.query,
+      chosenUrl: null,
+      candidates: [],
+      neighbours: containing(intent.query),
+      now: Date.now(),
+    });
+  }
+
+  return null;
 }
 
 /**
@@ -284,6 +303,22 @@ function buildSwitchOffer(url, intent) {
  * thing you might want is another grocer, and offering nothing wastes the
  * five seconds the panel is on screen.
  */
+/**
+ * Catalog sites whose name merely contains the query. Too weak a signal to
+ * navigate on — which is why the predictor only matches prefixes — but worth
+ * offering after a search jump, where there is otherwise nothing to show.
+ * "tube" finds youtube; "giganten" finds elgiganten.
+ */
+function containing(query) {
+  const q = query.trim().toLowerCase();
+  if (q.length < 3) return [];
+  return state.sites
+    .filter((s) => !s.name.startsWith(q) && s.name.includes(q))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, MAX_SUGGESTIONS)
+    .map((s) => ({ name: s.name, url: destinationOf(s) }));
+}
+
 function neighboursOf(site) {
   if (!site?.category) return [];
   return state.sites

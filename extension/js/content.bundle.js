@@ -214,7 +214,7 @@ const SEARCH_URL = "https://www.google.com/search?q=";
  * almost-empty panel is a wasted five seconds. Prefix matches always rank
  * first — they are what you were actually typing.
  */
-function buildOffer({ query, chosenUrl, candidates, neighbours = [], now }) {
+function buildOffer({ query, chosenUrl, candidates, neighbours = [], kind = "site", now }) {
   const alternatives = [];
   for (const { name, url } of [...candidates, ...neighbours]) {
     if (url === chosenUrl || alternatives.some((a) => a.url === url)) continue;
@@ -222,6 +222,7 @@ function buildOffer({ query, chosenUrl, candidates, neighbours = [], now }) {
     if (alternatives.length === MAX_ALTERNATIVES) break;
   }
   return {
+    kind,
     query,
     chosenUrl,
     alternatives,
@@ -241,6 +242,13 @@ function isOfferValid(offer, currentUrl, now) {
   if (!offer || typeof offer.createdAt !== "number") return false;
   if (!Array.isArray(offer.alternatives) || typeof offer.query !== "string") return false;
   if (now - offer.createdAt > OFFER_TTL_MS) return false;
+
+  // A search jump has no known destination — the search engine decides where
+  // you land — so there is nothing to compare against. Freshness is the only
+  // check available, and it is also the navigation you are least sure about,
+  // which is exactly when the panel earns its place.
+  if (offer.kind === "search") return true;
+
   // Registrable domain, not exact host: sites routinely bounce you to another
   // host they own on the way in (hm.com -> www2.hm.com), and an exact compare
   // would silently void the offer exactly when it landed successfully.

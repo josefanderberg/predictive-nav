@@ -106,6 +106,39 @@ test("an offer expires", () => {
   assert.ok(!isOfferValid(offer, "https://www.linkedin.com", 1000 + OFFER_TTL_MS + 1));
 });
 
+test("a search jump is valid wherever it lands", () => {
+  // The engine picks the destination, so there is nothing to compare against;
+  // only freshness can be checked.
+  const offer = buildOffer({
+    kind: "search",
+    query: "power",
+    chosenUrl: null,
+    candidates: [],
+    now: 1000,
+  });
+  assert.ok(isOfferValid(offer, "https://www.power.se/", 1500));
+  assert.ok(isOfferValid(offer, "https://some.unexpected.site/x", 1500));
+  assert.ok(!isOfferValid(offer, "https://www.power.se/", 1000 + OFFER_TTL_MS + 1), "still expires");
+});
+
+test("a site offer stays pinned to its destination", () => {
+  const offer = buildOffer({
+    kind: "site",
+    query: "li",
+    chosenUrl: "https://www.linkedin.com",
+    candidates,
+    now: 1000,
+  });
+  assert.ok(!isOfferValid(offer, "https://some.other.site/", 1500));
+});
+
+test("an offer with no kind is treated as a site offer", () => {
+  // Guards against a stale record written by an older version.
+  const offer = { query: "x", chosenUrl: "https://x.com", alternatives: [], createdAt: 0 };
+  assert.ok(isOfferValid(offer, "https://x.com/feed", 100));
+  assert.ok(!isOfferValid(offer, "https://elsewhere.example/", 100));
+});
+
 test("garbage offers are rejected rather than rendered", () => {
   assert.ok(!isOfferValid(null, "https://x.com", 0));
   assert.ok(!isOfferValid({}, "https://x.com", 0));
