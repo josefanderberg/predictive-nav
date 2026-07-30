@@ -85,13 +85,18 @@ async function init() {
  * Get the caret into the bar so the first thing typed is a destination, not a
  * lost keystroke.
  *
- * Chrome parks focus in the address bar when a new tab opens and can take it
- * back after the page paints, so one focus() call during load loses the race.
- * We ask repeatedly for a moment, again whenever the tab is shown, and treat
- * any printable key pressed elsewhere on the page as meant for the bar.
+ * Desktop: Chrome parks focus in the address bar when a new tab opens and can
+ * take it back after the page paints, so one focus() call during load loses
+ * the race. We ask repeatedly for a moment, again whenever the tab is shown,
+ * and treat any printable key pressed elsewhere on the page as meant for the
+ * bar.
  *
- * The honest limit: keystrokes that go to the address bar never reach this
- * page at all, so nothing here can recover them.
+ * Mobile: the soft keyboard cannot be opened programmatically at all. iOS only
+ * raises it from a trusted gesture, and only when focus() runs synchronously
+ * inside that gesture's handler — an await or a timer moves execution out of
+ * the gesture and the keyboard stays down. So the best available is to make
+ * the first tap anywhere count as tapping the bar, which is why the handler
+ * below calls focus() directly rather than deferring.
  */
 function claimFocus() {
   const focus = () => {
@@ -102,6 +107,18 @@ function claimFocus() {
   for (const delay of [0, 30, 100, 250, 500]) setTimeout(focus, delay);
   document.addEventListener("visibilitychange", () => !document.hidden && focus());
   window.addEventListener("focus", focus);
+
+  // Anything already interactive keeps its own tap — stealing focus here would
+  // break clicking a suggestion.
+  const INTERACTIVE = "a, button, input, textarea, select, #suggestions";
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return;
+      focus(); // synchronous: this is what lets a mobile keyboard open
+    },
+    { passive: true }
+  );
 
   document.addEventListener("keydown", (event) => {
     if (event.target === els.input) return;

@@ -15,8 +15,13 @@
         <input
           id="nav-input"
           type="text"
+          autofocus
           autocomplete="off"
           spellcheck="false"
+          autocapitalize="off"
+          autocorrect="off"
+          enterkeyhint="go"
+          inputmode="text"
           placeholder="Start typing a site or a search…"
           aria-label="Type a site name or a search query"
         />
@@ -30,8 +35,10 @@
 
       <p class="status" id="status" role="status"></p>
       <p class="hint">
-        Known sites go instantly · anything else jumps to the first result,
-        past the ads · <kbd>Esc</kbd> pauses · <kbd>Enter</kbd> goes now
+        Known sites go instantly · anything else jumps to the first result, past
+        the ads<span class="hint-keys"> · <kbd>Esc</kbd> pauses ·
+          <kbd>Enter</kbd> goes now</span
+        ><span class="hint-touch"> · tap anywhere to start typing</span>
       </p>
 
       <div class="banner" id="banner" role="alert"></div>

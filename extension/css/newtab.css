@@ -55,7 +55,8 @@ body {
 .ghost {
   width: 100%;
   padding: 1.1rem 3.2rem 1.1rem 1.4rem;
-  font-size: 1.5rem;
+  /* Never below 16px: iOS zooms the page in on any smaller focused field. */
+  font-size: clamp(1rem, 4.5vw, 1.5rem);
   font-family: inherit;
   text-align: left;
 }
@@ -187,6 +188,26 @@ kbd {
   border: 1px solid var(--text-dim);
   border-radius: 4px;
   font-size: 0.85em;
+}
+
+/* A device with no hover has no Esc and no Enter key to speak of, so the
+   keyboard hint is noise. The touch hint replaces it. */
+.hint-keys {
+  display: none;
+}
+
+.hint-touch {
+  display: inline;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hint-keys {
+    display: inline;
+  }
+
+  .hint-touch {
+    display: none;
+  }
 }
 
 .banner {
