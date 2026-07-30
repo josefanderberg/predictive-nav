@@ -30,6 +30,9 @@ import {
   applyVisits,
   learnedCount,
   trustedSites,
+  addCustomSite,
+  mergeCustomSites,
+  siteNameFromUrl,
 } from "./memory.js";
 
 /** Which search engine handles anything the catalog does not know. */
@@ -77,6 +80,8 @@ const state = {
   rejections: {},
   /** site name -> times a guess sent us there and stuck */
   visits: {},
+  /** site name -> address this person typed out themselves */
+  custom: {},
 };
 
 const DEMO_MODE = new URLSearchParams(location.search).has("demo");
@@ -96,10 +101,10 @@ async function init() {
   await learnFromLastVisit();
 
   try {
-    state.sites = applyVisits(await loadSites(), state.visits);
+    state.sites = personalise(await loadSites());
   } catch {
     const { SEED_SITES } = await import("./sites.js");
-    state.sites = applyVisits(SEED_SITES, state.visits);
+    state.sites = personalise(SEED_SITES);
   }
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
@@ -118,10 +123,11 @@ async function learnFromLastVisit() {
   if (!local) return;
 
   try {
-    const stored = await local.get(["lastGuess", "rejections", "visits"]);
+    const stored = await local.get(["lastGuess", "rejections", "visits", "custom"]);
     const { lastGuess } = stored;
     state.rejections = stored.rejections ?? {};
     state.visits = stored.visits ?? {};
+    state.custom = stored.custom ?? {};
     if (!lastGuess) return;
 
     const how = navigationType(performance.getEntriesByType("navigation"));
@@ -141,13 +147,40 @@ async function learnFromLastVisit() {
   }
 }
 
-/** Record where a guess sent us, so a quick return can be read as a rejection. */
-async function rememberGuess(intent) {
-  if (intent?.type !== "site" || !intent.site) return;
+/** The catalog with this person's own addresses folded in and their habits applied. */
+function personalise(sites) {
+  return applyVisits(mergeCustomSites(sites, state.custom), state.visits);
+}
+
+/**
+ * Record where a guess sent us, so a quick return can be read as a rejection.
+ *
+ * A typed address is also remembered as a site of its own. That is the only
+ * way something outside the catalog — vadkul.se, a work intranet — can ever
+ * become reachable from two letters: you type it out once, and from then on
+ * it competes like anything else.
+ */
+async function rememberGuess(intent, url) {
+  const local = chrome?.storage?.local;
+  if (!local) return;
+
   try {
-    await chrome?.storage?.local?.set({
-      lastGuess: { query: intent.query, name: intent.site.name, at: Date.now() },
-    });
+    if (intent?.type === "site" && intent.site) {
+      await local.set({
+        lastGuess: { query: intent.query, name: intent.site.name, at: Date.now() },
+      });
+      return;
+    }
+
+    if (intent?.type === "url") {
+      const name = siteNameFromUrl(url);
+      if (!name) return;
+      state.custom = addCustomSite(state.custom, url);
+      await local.set({
+        custom: state.custom,
+        lastGuess: { query: name, name, at: Date.now() },
+      });
+    }
   } catch {
     // best-effort
   }
@@ -210,8 +243,15 @@ function claimFocus() {
  */
 function renderDiagnostics() {
   const isExtension = location.protocol === "chrome-extension:";
-  const learned = learnedCount(state.visits);
-  const parts = [learned > 0 ? `${state.sites.length} sites · ${learned} yours` : `${state.sites.length} sites`];
+  const yours = learnedCount(state.visits);
+  const added = Object.keys(state.custom).length;
+
+  // The catalog total is the starting guess about everyone; the interesting
+  // number is how much of it has become this person's.
+  const counts = [`${state.sites.length} sites`];
+  if (yours > 0) counts.push(`${yours} yours`);
+  if (added > 0) counts.push(`${added} you added`);
+  const parts = [counts.join(" · ")];
 
   if (DEMO_MODE) parts.push("demo mode — nothing actually navigates");
   else if (!isExtension) parts.push("web page — navigates, but the destination overlay needs the installed extension");
@@ -356,7 +396,7 @@ async function navigateTo(url, intent = null) {
   }
 
   if (offer) await storeSwitchOffer(offer);
-  await rememberGuess(intent);
+  await rememberGuess(intent, url);
   location.assign(url);
 }
 

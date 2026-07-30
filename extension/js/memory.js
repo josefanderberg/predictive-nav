@@ -110,6 +110,66 @@ export function learnedCount(visits) {
   return Object.keys(visits ?? {}).length;
 }
 
+/**
+ * The weight a site gets for having been typed out in full.
+ *
+ * Deliberately mid-table. Typing the whole address is strong evidence that
+ * you want the site, but not evidence about how it ranks against everything
+ * else — that is what visits are for.
+ */
+export const TYPED_SITE_WEIGHT = 55;
+
+/**
+ * The name a typed address should be remembered under: the thing you would
+ * plausibly type next time. "https://www.vadkul.se/events" -> "vadkul".
+ * Returns null for anything that would not make a usable prefix.
+ */
+export function siteNameFromUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\d?\./, "").toLowerCase();
+    const label = host.split(".")[0].replace(/[^a-z0-9]/g, "");
+    return label.length >= 2 ? label : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A copy of `custom` with this address remembered as a site of its own.
+ * Re-typing an address you already added just refreshes where it points.
+ */
+export function addCustomSite(custom, url) {
+  const name = siteNameFromUrl(url);
+  if (!name) return custom;
+  return { ...custom, [name]: { name, url, weight: TYPED_SITE_WEIGHT } };
+}
+
+/** A copy with a remembered address forgotten. */
+export function removeCustomSite(custom, name) {
+  if (!custom || !(name in custom)) return custom;
+  const { [name]: _dropped, ...rest } = custom;
+  return rest;
+}
+
+/**
+ * The catalog plus the addresses this person typed themselves.
+ *
+ * A typed address that matches a catalog name updates where that name points
+ * rather than adding a duplicate — if you type blocket.se, you mean the
+ * Blocket you already have, not a second entry competing with it.
+ */
+export function mergeCustomSites(sites, custom) {
+  const entries = Object.values(custom ?? {});
+  if (entries.length === 0) return sites;
+
+  const byName = new Map(sites.map((site) => [site.name, site]));
+  for (const { name, url, weight } of entries) {
+    const existing = byName.get(name);
+    byName.set(name, existing ? { ...existing, url } : { name, url, weight, category: "yours" });
+  }
+  return [...byName.values()];
+}
+
 /** A copy with every rejection for `query` forgotten. */
 export function clearRejections(rejections, query) {
   const key = normalize(query);

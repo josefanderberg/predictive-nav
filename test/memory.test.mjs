@@ -13,6 +13,10 @@ import {
   learnedCount,
   MAX_VISIT_BONUS,
   trustedSites,
+  siteNameFromUrl,
+  addCustomSite,
+  removeCustomSite,
+  mergeCustomSites,
 } from "../extension/js/memory.js";
 import { predict } from "../extension/js/predictor.js";
 import { SEED_SITES } from "../extension/js/sites.js";
@@ -167,6 +171,57 @@ test("learnedCount reports how much of the catalog is actually yours", () => {
   assert.equal(learnedCount({}), 0);
   assert.equal(learnedCount(undefined), 0);
   assert.equal(learnedCount({ wolt: 9, blocket: 2 }), 2);
+});
+
+test("a typed address is remembered under the name you would type next", () => {
+  assert.equal(siteNameFromUrl("https://vadkul.se"), "vadkul");
+  assert.equal(siteNameFromUrl("https://www.vadkul.se/events?x=1"), "vadkul");
+  assert.equal(siteNameFromUrl("https://www2.hm.com/sv_se/"), "hm");
+  assert.equal(siteNameFromUrl("http://intranet.corp.example/wiki"), "intranet");
+});
+
+test("addresses that make no usable prefix are not remembered", () => {
+  assert.equal(siteNameFromUrl("not a url"), null);
+  assert.equal(siteNameFromUrl("https://a.se"), null, "one letter is not a prefix");
+  assert.equal(siteNameFromUrl(""), null);
+  assert.deepEqual(addCustomSite({}, "not a url"), {}, "nothing is stored for junk");
+  assert.deepEqual(addCustomSite({}, "https://a.se"), {});
+});
+
+test("the user's scenario: typing vadkul.se once makes it reachable from two letters", () => {
+  const catalog = [{ name: "vasttrafik", weight: 52, url: "https://www.vasttrafik.se" }];
+  assert.equal(predict("va", catalog).site.name, "vasttrafik", "before");
+
+  const custom = addCustomSite({}, "https://vadkul.se");
+  const sites = mergeCustomSites(catalog, custom);
+  assert.equal(sites.length, 2);
+  assert.ok(sites.some((s) => s.name === "vadkul" && s.url === "https://vadkul.se"));
+
+  // And once it has been used a few times it wins its prefix outright.
+  let visits = {};
+  for (let i = 0; i < 4; i++) visits = recordVisit(visits, "vadkul");
+  const p = predict("vad", applyVisits(sites, visits), { trusted: trustedSites(visits) });
+  assert.equal(p.site.name, "vadkul");
+  assert.equal(p.kind, "commit");
+});
+
+test("typing an address you already have updates it instead of duplicating", () => {
+  const catalog = [{ name: "blocket", weight: 84, url: "https://www.blocket.se" }];
+  const custom = addCustomSite({}, "https://blocket.se/bilar");
+  const sites = mergeCustomSites(catalog, custom);
+  assert.equal(sites.length, 1, "no second Blocket competing with the first");
+  assert.equal(sites[0].url, "https://blocket.se/bilar");
+  assert.equal(sites[0].weight, 84, "the catalog's own weight is kept");
+});
+
+test("remembered addresses can be forgotten, and the catalog is never mutated", () => {
+  const catalog = [{ name: "blocket", weight: 84, url: "https://www.blocket.se" }];
+  const custom = addCustomSite({}, "https://vadkul.se");
+  mergeCustomSites(catalog, custom);
+  assert.equal(catalog.length, 1, "merging must not touch the seed list");
+  assert.equal(mergeCustomSites(catalog, {}), catalog, "nothing added, nothing copied");
+  assert.deepEqual(removeCustomSite(custom, "vadkul"), {});
+  assert.equal(removeCustomSite(custom, "never-added"), custom);
 });
 
 test("the user's scenario: wo stops going to wolt, but wolt still does", () => {
