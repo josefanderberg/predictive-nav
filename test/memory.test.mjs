@@ -214,6 +214,24 @@ test("typing an address you already have updates it instead of duplicating", () 
   assert.equal(sites[0].weight, 84, "the catalog's own weight is kept");
 });
 
+test("a same-named site on a different domain never hijacks the catalog entry", () => {
+  // max.se is a Swedish burger chain; max.com is HBO Max. Repointing the
+  // catalog entry would hand one brand's name to the other, silently.
+  const catalog = [
+    { name: "max", weight: 56, url: "https://www.max.com", category: "streaming" },
+  ];
+  const sites = mergeCustomSites(catalog, addCustomSite({}, "https://max.se"));
+
+  const hboMax = sites.find((s) => s.name === "max");
+  assert.equal(hboMax.url, "https://www.max.com", "the catalog entry is untouched");
+  assert.equal(hboMax.category, "streaming");
+
+  const burgers = sites.find((s) => s.url === "https://max.se");
+  assert.ok(burgers, "the typed address is still reachable");
+  assert.notEqual(burgers.name, "max");
+  assert.equal(sites.length, 2, "and the site count actually moves");
+});
+
 test("remembered addresses can be forgotten, and the catalog is never mutated", () => {
   const catalog = [{ name: "blocket", weight: 84, url: "https://www.blocket.se" }];
   const custom = addCustomSite({}, "https://vadkul.se");

@@ -13,6 +13,7 @@
  * Everything here is pure so the rules can be tested without a browser; the
  * storage wiring lives in main.js.
  */
+import { sameDomain } from "./domain.js";
 
 /**
  * How long after leaving the bar a return still counts as a rejection.
@@ -154,9 +155,15 @@ export function removeCustomSite(custom, name) {
 /**
  * The catalog plus the addresses this person typed themselves.
  *
- * A typed address that matches a catalog name updates where that name points
- * rather than adding a duplicate — if you type blocket.se, you mean the
- * Blocket you already have, not a second entry competing with it.
+ * A typed address on the same domain as a catalog entry just updates where
+ * that entry points — blocket.se/bilar means the Blocket you already have.
+ *
+ * A different domain that happens to share a name is a different site, and
+ * must not overwrite it: max.se is a Swedish burger chain and max.com is HBO
+ * Max. Silently repointing the catalog entry would hijack the famous one, hide
+ * the change behind an unchanged site count, and move the destination outside
+ * the manifest's match patterns so the content script stopped running there.
+ * It is kept under a distinct name instead.
  */
 export function mergeCustomSites(sites, custom) {
   const entries = Object.values(custom ?? {});
@@ -165,9 +172,28 @@ export function mergeCustomSites(sites, custom) {
   const byName = new Map(sites.map((site) => [site.name, site]));
   for (const { name, url, weight } of entries) {
     const existing = byName.get(name);
-    byName.set(name, existing ? { ...existing, url } : { name, url, weight, category: "yours" });
+    if (!existing) {
+      byName.set(name, { name, url, weight, category: "yours" });
+    } else if (sameDomain(existing.url, url)) {
+      byName.set(name, { ...existing, url });
+    } else {
+      const distinct = distinctName(byName, url, name);
+      if (distinct) byName.set(distinct, { name: distinct, url, weight, category: "yours" });
+    }
   }
   return [...byName.values()];
+}
+
+/** A free name for a typed address whose obvious one is already taken. */
+function distinctName(byName, url, taken) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\d?\./, "").toLowerCase();
+    // "max.se" -> "maxse": still something a person could plausibly type.
+    const candidate = host.replace(/[^a-z0-9]/g, "");
+    return candidate && candidate !== taken && !byName.has(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A copy with every rejection for `query` forgotten. */

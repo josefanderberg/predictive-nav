@@ -46,8 +46,20 @@ const PROVIDER = PROVIDERS.google;
  * and choose from; a wrong site is a page you have to escape.
  */
 const JUMP_TO_FIRST_RESULT = false;
-/** Set false to require Enter for search fallbacks (known sites still auto-go). */
-const AUTO_LUCKY = true;
+/**
+ * Whether a search fires on its own, or waits for Enter.
+ *
+ * Off. The early letters of a domain are indistinguishable from a word — at
+ * "vadkul" nothing yet says an address is coming — so any auto-search timer
+ * eventually fires mid-hostname and takes the page away before the address
+ * exists. Guarding on the dot only covers the tail of the problem.
+ *
+ * Little is lost: auto-commit earns its keep by reaching a known site without
+ * a keystroke, whereas a search still leaves you a page to read and choose
+ * from, so pressing Enter costs one key and removes an entire class of
+ * misfire. Known sites are unaffected and still go instantly.
+ */
+const AUTO_LUCKY = false;
 
 const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
 /**
@@ -134,7 +146,7 @@ async function learnFromLastVisit() {
     if (!lastGuess) return;
 
     const how = navigationType(performance.getEntriesByType("navigation"));
-    if (isBounce(lastGuess, how, Date.now())) {
+    if (lastGuess.kind !== "url" && isBounce(lastGuess, how, Date.now())) {
       state.rejections = addRejection(state.rejections, lastGuess.query, lastGuess.name);
       await local.set({ rejections: state.rejections });
     } else {
@@ -210,9 +222,13 @@ async function rememberGuess(intent, url) {
       const name = siteNameFromUrl(url);
       if (!name) return;
       state.custom = addCustomSite(state.custom, url);
+      // kind "url" so the return trip can only ever count as a visit. A typed
+      // address is not a prediction and cannot be wrong — and checking whether
+      // it was remembered means pressing Back, which would otherwise blacklist
+      // the site under its own name the moment you went to look.
       await local.set({
         custom: state.custom,
-        lastGuess: { query: name, name, at: Date.now() },
+        lastGuess: { kind: "url", query: name, name, at: Date.now() },
       });
     }
   } catch {
@@ -370,15 +386,23 @@ function resolveIntent(text) {
     return { type: "none", url: null, status: "Keep typing…", candidates: [], delay: null };
   }
 
+  // An address is only recognised once it ends in a real suffix, so every
+  // keystroke of "vadkul.se" before the final "e" looks like a search. Arming
+  // the timer through those states means one pause mid-domain fires a search
+  // for half a hostname — and takes the page away before the address exists.
+  const typingAddress = !/\s/.test(query) && query.includes(".");
+
   return {
     type: "lucky",
     url: JUMP_TO_FIRST_RESULT ? PROVIDER.lucky(query) : PROVIDER.search(query),
     query,
-    status: JUMP_TO_FIRST_RESULT
-      ? `First result for “${query}” — skips the ads · ${PROVIDER.label}`
-      : `Search ${PROVIDER.label} for “${query}”`,
+    status: typingAddress
+      ? `Finish the address, or press Enter to search for “${query}”`
+      : JUMP_TO_FIRST_RESULT
+        ? `First result for “${query}” — skips the ads · ${PROVIDER.label}`
+        : `Search ${PROVIDER.label} for “${query}”`,
     candidates: [],
-    delay: AUTO_LUCKY ? LUCKY_DELAY_MS : null,
+    delay: AUTO_LUCKY && !typingAddress ? LUCKY_DELAY_MS : null,
   };
 }
 
