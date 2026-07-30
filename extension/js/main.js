@@ -153,6 +153,24 @@ function personalise(sites) {
 }
 
 /**
+ * The sites that have become this person's own — ones they added by typing an
+ * address, and ones they keep going back to, most-used first.
+ *
+ * Shown under an empty bar. Learning that leaves no trace on screen is
+ * indistinguishable from learning that never happened, and this is also a
+ * usable launcher in its own right.
+ */
+function yourSites() {
+  const visits = (name) => state.visits[name] ?? 0;
+  const added = new Set(Object.keys(state.custom));
+  return state.sites
+    .filter((site) => added.has(site.name) || visits(site.name) > 0)
+    .sort((a, b) => visits(b.name) - visits(a.name) || b.weight - a.weight)
+    .slice(0, MAX_SUGGESTIONS)
+    .map((site) => ({ site }));
+}
+
+/**
  * Record where a guess sent us, so a quick return can be read as a rejection.
  *
  * A typed address is also remembered as a site of its own. That is the only
@@ -253,8 +271,9 @@ function renderDiagnostics() {
   if (added > 0) counts.push(`${added} you added`);
   const parts = [counts.join(" · ")];
 
-  if (DEMO_MODE) parts.push("demo mode — nothing actually navigates");
-  else if (!isExtension) parts.push("web page — navigates, but the destination overlay needs the installed extension");
+  if (DEMO_MODE) parts.push("demo mode — nothing navigates and nothing is remembered");
+  else if (!isExtension)
+    parts.push("web page — navigates, but cannot remember sites or show the arrival overlay");
   else parts.push("running as the extension — all features active");
 
   els.diagnostics.replaceChildren(document.createTextNode(parts.join(" · ")));
@@ -348,6 +367,7 @@ function onInput() {
   if (!intent) {
     state.suppressed = false;
     render(null);
+    renderSuggestions(yourSites());
     return;
   }
 
