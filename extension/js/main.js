@@ -26,6 +26,10 @@ import {
   addRejection,
   rejectedFor,
   navigationType,
+  recordVisit,
+  applyVisits,
+  learnedCount,
+  trustedSites,
 } from "./memory.js";
 
 /** Which search engine handles anything the catalog does not know. */
@@ -71,6 +75,8 @@ const state = {
   intent: null,
   /** query -> site names this query was sent to and turned back from */
   rejections: {},
+  /** site name -> times a guess sent us there and stuck */
+  visits: {},
 };
 
 const DEMO_MODE = new URLSearchParams(location.search).has("demo");
@@ -90,10 +96,10 @@ async function init() {
   await learnFromLastVisit();
 
   try {
-    state.sites = await loadSites();
+    state.sites = applyVisits(await loadSites(), state.visits);
   } catch {
     const { SEED_SITES } = await import("./sites.js");
-    state.sites = SEED_SITES;
+    state.sites = applyVisits(SEED_SITES, state.visits);
   }
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
@@ -112,17 +118,23 @@ async function learnFromLastVisit() {
   if (!local) return;
 
   try {
-    const { lastGuess, rejections = {} } = await local.get(["lastGuess", "rejections"]);
-    state.rejections = rejections;
+    const stored = await local.get(["lastGuess", "rejections", "visits"]);
+    const { lastGuess } = stored;
+    state.rejections = stored.rejections ?? {};
+    state.visits = stored.visits ?? {};
+    if (!lastGuess) return;
 
     const how = navigationType(performance.getEntriesByType("navigation"));
-    if (!isBounce(lastGuess, how, Date.now())) {
-      if (lastGuess) await local.remove("lastGuess");
-      return;
+    if (isBounce(lastGuess, how, Date.now())) {
+      state.rejections = addRejection(state.rejections, lastGuess.query, lastGuess.name);
+      await local.set({ rejections: state.rejections });
+    } else {
+      // Not turned back from, so the guess was right. Counting only guesses
+      // that stuck is what turns the generic catalog into this person's own
+      // short list of sites.
+      state.visits = recordVisit(state.visits, lastGuess.name);
+      await local.set({ visits: state.visits });
     }
-
-    state.rejections = addRejection(rejections, lastGuess.query, lastGuess.name);
-    await local.set({ rejections: state.rejections });
     await local.remove("lastGuess");
   } catch {
     // storage is best-effort; never block the bar on it
@@ -198,7 +210,8 @@ function claimFocus() {
  */
 function renderDiagnostics() {
   const isExtension = location.protocol === "chrome-extension:";
-  const parts = [`${state.sites.length} sites`];
+  const learned = learnedCount(state.visits);
+  const parts = [learned > 0 ? `${state.sites.length} sites · ${learned} yours` : `${state.sites.length} sites`];
 
   if (DEMO_MODE) parts.push("demo mode — nothing actually navigates");
   else if (!isExtension) parts.push("web page — navigates, but the destination overlay needs the installed extension");
@@ -244,6 +257,7 @@ function resolveIntent(text) {
 
   const prediction = predict(query, state.sites, {
     exclude: rejectedFor(state.rejections, query),
+    trusted: trustedSites(state.visits),
   });
   if (prediction.kind !== "none") {
     const url = destinationOf(prediction.site);

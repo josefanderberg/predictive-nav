@@ -50,6 +50,66 @@ export function rejectedFor(rejections, query) {
   return new Set(rejections?.[normalize(query)] ?? []);
 }
 
+/**
+ * How much a site can gain from being one you actually use.
+ *
+ * The catalog is a starting guess about everyone; this is the correction for
+ * one person. A site you visit daily has to be able to outrank a globally
+ * popular one you never touch, otherwise two letters stay ambiguous forever.
+ */
+export const MAX_VISIT_BONUS = 80;
+const BONUS_PER_VISIT = 10;
+
+/**
+ * Visits after which a site is treated as demonstrated habit rather than a
+ * guess. Three is enough to rule out a slip, few enough that a site you use
+ * becomes instant within a day or two.
+ */
+export const TRUST_AFTER_VISITS = 3;
+
+/**
+ * Sites this person has gone to often enough that ambiguity is settled by
+ * evidence rather than by scoring.
+ */
+export function trustedSites(visits, threshold = TRUST_AFTER_VISITS) {
+  return new Set(
+    Object.entries(visits ?? {})
+      .filter(([, count]) => count >= threshold)
+      .map(([name]) => name)
+  );
+}
+
+/** A copy of `visits` with one more visit counted for `name`. */
+export function recordVisit(visits, name) {
+  if (!name) return visits;
+  return { ...visits, [name]: (visits?.[name] ?? 0) + 1 };
+}
+
+/** The weight bonus a site has earned, capped so early habits cannot lock in. */
+export function visitBonus(visits, name) {
+  const count = visits?.[name] ?? 0;
+  return Math.min(count * BONUS_PER_VISIT, MAX_VISIT_BONUS);
+}
+
+/**
+ * The catalog re-weighted around what this person actually opens.
+ *
+ * Returns a new array; the seed catalog is never mutated, so forgetting the
+ * learned data restores the original behaviour exactly.
+ */
+export function applyVisits(sites, visits) {
+  if (!visits || Object.keys(visits).length === 0) return sites;
+  return sites.map((site) => {
+    const bonus = visitBonus(visits, site.name);
+    return bonus > 0 ? { ...site, weight: site.weight + bonus } : site;
+  });
+}
+
+/** How many distinct sites this person has actually been sent to. */
+export function learnedCount(visits) {
+  return Object.keys(visits ?? {}).length;
+}
+
 /** A copy with every rejection for `query` forgotten. */
 export function clearRejections(rejections, query) {
   const key = normalize(query);

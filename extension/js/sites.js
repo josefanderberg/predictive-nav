@@ -19,7 +19,9 @@ export const SEED_SITES = [
   { name: "gmail", url: "https://mail.google.com", weight: 88, category: "productivity" },
   { name: "maps", url: "https://maps.google.com", weight: 70, category: "productivity" },
   { name: "translate", url: "https://translate.google.com", weight: 55, category: "productivity" },
-  { name: "drive", url: "https://drive.google.com", weight: 58, category: "productivity" },
+  // /drive, not the bare root: Drive's app-link file covers "*/drive" and has
+  // no entry for "/", so the root opens the website while this opens the app.
+  { name: "drive", url: "https://drive.google.com/drive", weight: 58, category: "productivity" },
   { name: "calendar", url: "https://calendar.google.com", weight: 52, category: "productivity" },
   { name: "outlook", url: "https://outlook.live.com", weight: 66, category: "productivity" },
   { name: "hotmail", url: "https://outlook.live.com", weight: 40, category: "productivity" },

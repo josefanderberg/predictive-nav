@@ -14,6 +14,8 @@ export const DEFAULTS = {
   minMargin: 1.5,
   /** Site names to drop before ranking — see memory.js. */
   exclude: new Set(),
+  /** Site names the user has demonstrably gone to before — see memory.js. */
+  trusted: new Set(),
 };
 
 /**
@@ -39,7 +41,7 @@ export function rankCandidates(input, sites, exclude = new Set()) {
  *   { kind: "commit",  site, candidates, confidence }   – confident: navigate
  */
 export function predict(input, sites, options = {}) {
-  const { minLength, minConfidence, minMargin, exclude } = { ...DEFAULTS, ...options };
+  const { minLength, minConfidence, minMargin, exclude, trusted } = { ...DEFAULTS, ...options };
   // Sites this exact query was already sent to and turned back from are gone,
   // not merely demoted: a guess the user has actively rejected should not be
   // the answer again, however far ahead it scores.
@@ -51,10 +53,16 @@ export function predict(input, sites, options = {}) {
   const confidence = top.score / totalScore;
   const margin = runnerUp ? top.score / runnerUp.score : Infinity;
 
+  /**
+   * The share rule asks the top candidate to dominate the field, which with
+   * only two matches means beating the runner-up threefold — a bar a site you
+   * personally use every day can never clear against a globally popular one.
+   * Demonstrated habit settles that ambiguity with evidence instead. The
+   * margin rule still applies either way, so a near-tie is never taken.
+   */
+  const convincing = confidence >= minConfidence || trusted.has(top.site.name);
   const confident =
-    normalize(input).length >= minLength &&
-    confidence >= minConfidence &&
-    margin >= minMargin;
+    normalize(input).length >= minLength && convincing && margin >= minMargin;
 
   return {
     kind: confident ? "commit" : "suggest",
