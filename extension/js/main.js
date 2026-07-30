@@ -82,6 +82,8 @@ const state = {
   visits: {},
   /** site name -> address this person typed out themselves */
   custom: {},
+  /** whether an empty bar lists your sites, or stays bare */
+  showYours: true,
 };
 
 const DEMO_MODE = new URLSearchParams(location.search).has("demo");
@@ -123,11 +125,12 @@ async function learnFromLastVisit() {
   if (!local) return;
 
   try {
-    const stored = await local.get(["lastGuess", "rejections", "visits", "custom"]);
+    const stored = await local.get(["lastGuess", "rejections", "visits", "custom", "showYours"]);
     const { lastGuess } = stored;
     state.rejections = stored.rejections ?? {};
     state.visits = stored.visits ?? {};
     state.custom = stored.custom ?? {};
+    state.showYours = stored.showYours ?? true;
     if (!lastGuess) return;
 
     const how = navigationType(performance.getEntriesByType("navigation"));
@@ -147,6 +150,18 @@ async function learnFromLastVisit() {
   }
 }
 
+/** Show or hide the list under an empty bar, and remember which you chose. */
+function setShowYours(show) {
+  state.showYours = show;
+  renderDiagnostics();
+  if (!els.input.value.trim()) renderSuggestions(yourSites());
+  try {
+    chrome?.storage?.local?.set({ showYours: show });
+  } catch {
+    // a preference is not worth failing over
+  }
+}
+
 /** The catalog with this person's own addresses folded in and their habits applied. */
 function personalise(sites) {
   return applyVisits(mergeCustomSites(sites, state.custom), state.visits);
@@ -161,6 +176,7 @@ function personalise(sites) {
  * usable launcher in its own right.
  */
 function yourSites() {
+  if (!state.showYours) return [];
   const visits = (name) => state.visits[name] ?? 0;
   const added = new Set(Object.keys(state.custom));
   return state.sites
@@ -264,20 +280,29 @@ function renderDiagnostics() {
   const yours = learnedCount(state.visits);
   const added = Object.keys(state.custom).length;
 
-  // The catalog total is the starting guess about everyone; the interesting
-  // number is how much of it has become this person's.
-  const counts = [`${state.sites.length} sites`];
-  if (yours > 0) counts.push(`${yours} yours`);
-  if (added > 0) counts.push(`${added} you added`);
-  const parts = [counts.join(" · ")];
+  const parts = [];
+  if (added > 0) parts.push(`${added} you added`);
 
   if (DEMO_MODE) parts.push("demo mode — nothing navigates and nothing is remembered");
   else if (!isExtension)
     parts.push("web page — navigates, but cannot remember sites or show the arrival overlay");
-  else parts.push("running as the extension — all features active");
 
-  els.diagnostics.replaceChildren(document.createTextNode(parts.join(" · ")));
+  els.diagnostics.replaceChildren();
   els.diagnostics.classList.toggle("error", !isExtension && !DEMO_MODE);
+
+  // The catalog total is a guess about everyone; the count that matters is how
+  // much has become this person's — and it doubles as the switch for the list,
+  // so controlling it needs no button of its own on an otherwise bare page.
+  const count = document.createElement("a");
+  count.href = "#";
+  count.textContent = `${state.sites.length} sites · ${yours} yours`;
+  count.title = state.showYours ? "Hide your sites" : "Show your sites";
+  count.addEventListener("click", (event) => {
+    event.preventDefault();
+    setShowYours(!state.showYours);
+  });
+  els.diagnostics.append(count);
+  if (parts.length > 0) els.diagnostics.append(document.createTextNode(` · ${parts.join(" · ")}`));
 
   if (!DEMO_MODE) return;
   const real = new URL(location.href);
