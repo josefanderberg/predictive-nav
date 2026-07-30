@@ -12,18 +12,20 @@ export const DEFAULTS = {
   minConfidence: 0.75,
   /** Top candidate must outweigh the runner-up by this factor. */
   minMargin: 1.5,
+  /** Site names to drop before ranking — see memory.js. */
+  exclude: new Set(),
 };
 
 /**
  * Rank all sites whose name starts with the typed prefix.
  * Returns candidates sorted by score (descending).
  */
-export function rankCandidates(input, sites) {
+export function rankCandidates(input, sites, exclude = new Set()) {
   const prefix = normalize(input);
   if (!prefix) return [];
 
   return sites
-    .filter((site) => site.name.startsWith(prefix))
+    .filter((site) => site.name.startsWith(prefix) && !exclude.has(site.name))
     .map((site) => ({ site, score: score(site, prefix) }))
     .sort((a, b) => b.score - a.score);
 }
@@ -37,8 +39,11 @@ export function rankCandidates(input, sites) {
  *   { kind: "commit",  site, candidates, confidence }   – confident: navigate
  */
 export function predict(input, sites, options = {}) {
-  const { minLength, minConfidence, minMargin } = { ...DEFAULTS, ...options };
-  const candidates = rankCandidates(input, sites);
+  const { minLength, minConfidence, minMargin, exclude } = { ...DEFAULTS, ...options };
+  // Sites this exact query was already sent to and turned back from are gone,
+  // not merely demoted: a guess the user has actively rejected should not be
+  // the answer again, however far ahead it scores.
+  const candidates = rankCandidates(input, sites, exclude);
   if (candidates.length === 0) return { kind: "none" };
 
   const [top, runnerUp] = candidates;

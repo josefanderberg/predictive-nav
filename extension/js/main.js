@@ -21,9 +21,24 @@ import { resolveRegionalUrl } from "./sites.js";
 import { loadSites } from "./user-sites.js";
 import { PROVIDERS, looksLikeUrl, toDirectUrl } from "./lucky.js";
 import { buildOffer } from "./switcher.js";
+import {
+  isBounce,
+  addRejection,
+  rejectedFor,
+  navigationType,
+} from "./memory.js";
 
-/** Which search engine backs the "first result" jump. See lucky.js. */
-const PROVIDER = PROVIDERS.duckduckgo;
+/** Which search engine handles anything the catalog does not know. */
+const PROVIDER = PROVIDERS.google;
+/**
+ * Whether an unknown word should jump straight to the first organic result.
+ *
+ * Off. Jumping saves a click when the guess is right, but lands you on a
+ * stranger's page when it is wrong — and for a two-word thought like "world
+ * war 2" it is wrong most of the time. Search results are a page you can read
+ * and choose from; a wrong site is a page you have to escape.
+ */
+const JUMP_TO_FIRST_RESULT = false;
 /** Set false to require Enter for search fallbacks (known sites still auto-go). */
 const AUTO_LUCKY = true;
 
@@ -54,6 +69,8 @@ const state = {
   timer: null,
   suppressed: false,
   intent: null,
+  /** query -> site names this query was sent to and turned back from */
+  rejections: {},
 };
 
 const DEMO_MODE = new URLSearchParams(location.search).has("demo");
@@ -70,6 +87,7 @@ async function init() {
   renderDiagnostics();
 
   allowContentScriptsToReadOffers();
+  await learnFromLastVisit();
 
   try {
     state.sites = await loadSites();
@@ -79,6 +97,48 @@ async function init() {
   }
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
+}
+
+/**
+ * If the last guess was answered with the Back button, remember not to make it
+ * again for that query.
+ *
+ * Runs before the catalog loads so the very first keystroke already benefits.
+ * Failures are silent by design: a browser without extension storage still
+ * gets a working bar, just one that cannot learn.
+ */
+async function learnFromLastVisit() {
+  const local = chrome?.storage?.local;
+  if (!local) return;
+
+  try {
+    const { lastGuess, rejections = {} } = await local.get(["lastGuess", "rejections"]);
+    state.rejections = rejections;
+
+    const how = navigationType(performance.getEntriesByType("navigation"));
+    if (!isBounce(lastGuess, how, Date.now())) {
+      if (lastGuess) await local.remove("lastGuess");
+      return;
+    }
+
+    state.rejections = addRejection(rejections, lastGuess.query, lastGuess.name);
+    await local.set({ rejections: state.rejections });
+    await local.remove("lastGuess");
+  } catch {
+    // storage is best-effort; never block the bar on it
+  }
+}
+
+/** Record where a guess sent us, so a quick return can be read as a rejection. */
+async function rememberGuess(intent) {
+  if (intent?.type !== "site" || !intent.site) return;
+  try {
+    await chrome?.storage?.local?.set({
+      lastGuess: { query: intent.query, name: intent.site.name, at: Date.now() },
+    });
+  } catch {
+    // best-effort
+  }
 }
 
 /**
@@ -182,7 +242,9 @@ function resolveIntent(text) {
     return { type: "url", url, status: `${url} — typed address`, candidates: [], delay: COMMIT_DELAY_MS };
   }
 
-  const prediction = predict(query, state.sites);
+  const prediction = predict(query, state.sites, {
+    exclude: rejectedFor(state.rejections, query),
+  });
   if (prediction.kind !== "none") {
     const url = destinationOf(prediction.site);
     const percent = Math.round(prediction.confidence * 100);
@@ -212,9 +274,11 @@ function resolveIntent(text) {
 
   return {
     type: "lucky",
-    url: PROVIDER.lucky(query),
+    url: JUMP_TO_FIRST_RESULT ? PROVIDER.lucky(query) : PROVIDER.search(query),
     query,
-    status: `First result for “${query}” — skips the ads · ${PROVIDER.label}`,
+    status: JUMP_TO_FIRST_RESULT
+      ? `First result for “${query}” — skips the ads · ${PROVIDER.label}`
+      : `Search ${PROVIDER.label} for “${query}”`,
     candidates: [],
     delay: AUTO_LUCKY ? LUCKY_DELAY_MS : null,
   };
@@ -278,6 +342,7 @@ async function navigateTo(url, intent = null) {
   }
 
   if (offer) await storeSwitchOffer(offer);
+  await rememberGuess(intent);
   location.assign(url);
 }
 
