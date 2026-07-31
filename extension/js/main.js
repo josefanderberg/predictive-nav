@@ -48,20 +48,23 @@ const PROVIDER = PROVIDERS.google;
  */
 const JUMP_TO_FIRST_RESULT = false;
 /**
- * Whether a search may fire on its own, given what has been typed.
+ * How long a search waits before going by itself, or null for never.
  *
- * A space settles it. Hostnames cannot contain one, so "world war 2" is
- * unambiguously a thing to look up and can go by itself. A single word cannot
- * be told apart from a domain still being typed — at "vadkul" nothing yet says
- * ".se" is coming — and a timer armed there fires mid-hostname and takes the
- * page away before the address exists, which is precisely how typing a new
- * site used to become impossible.
+ * The hard case is telling "bkbpsk" — plainly something to look up — from
+ * "vadkul", which may be one keystroke away from becoming vadkul.se. The text
+ * alone cannot separate them, but the pause after it can: nobody stops for a
+ * second and a half in the middle of typing a domain.
  *
- * So phrases search on their own and single words wait for Enter. That is one
- * keystroke on the ambiguous case, and it buys back the whole class of misfire.
+ * A dot settles it outright in the other direction. Nothing but an address has
+ * one mid-word, so those never go on their own — that is what stopped a search
+ * firing halfway through a hostname and making new sites impossible to add.
  */
-function mayAutoSearch(query) {
-  return /\s/.test(query.trim());
+function autoSearchDelay(query) {
+  const q = query.trim();
+  if (q.includes(".")) return null;
+  // A space cannot occur in a hostname, so this is unambiguously a lookup.
+  if (/\s/.test(q)) return LUCKY_DELAY_MS;
+  return SINGLE_WORD_DELAY_MS;
 }
 
 const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
@@ -73,6 +76,12 @@ const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
  */
 const SOLE_MATCH_DELAY_MS = 200;
 const LUCKY_DELAY_MS = 900; // search fallback: riskier, leave room to keep typing
+/**
+ * A lone word gets longer, because it might still be turning into a domain.
+ * Well past a typing pause (~180ms between keys) but short enough to feel
+ * automatic once you have actually stopped.
+ */
+const SINGLE_WORD_DELAY_MS = 1500;
 const MIN_LUCKY_LENGTH = 3;
 const MAX_SUGGESTIONS = 5;
 
@@ -403,17 +412,17 @@ function resolveIntent(text) {
     return { type: "none", url: null, status: "Keep typing…", candidates: [], delay: null };
   }
 
-  const auto = mayAutoSearch(query);
+  const delay = autoSearchDelay(query);
 
   return {
     type: "lucky",
     url: JUMP_TO_FIRST_RESULT ? PROVIDER.lucky(query) : PROVIDER.search(query),
     query,
-    status: auto
+    status: delay
       ? `Search ${PROVIDER.label} for “${query}”`
-      : `Press Enter to search ${PROVIDER.label} for “${query}”`,
+      : `Finish the address, or press Enter to search for “${query}”`,
     candidates: [],
-    delay: auto ? LUCKY_DELAY_MS : null,
+    delay,
   };
 }
 

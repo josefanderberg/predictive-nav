@@ -139,6 +139,112 @@
       li + li {
         margin-top: 0.4rem;
       }
+      /* --- the race ------------------------------------------------------ */
+      .race {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+      @media (min-width: 40rem) {
+        .race {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .lane {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem;
+        background: var(--surface);
+      }
+      .lane-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+      }
+      .lane-name {
+        font-weight: 600;
+      }
+      .lane-clock {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 1.35rem;
+        color: var(--text-dim);
+      }
+      .lane[data-done="true"] .lane-clock {
+        color: var(--accent);
+      }
+      .lane-screen {
+        margin-top: 0.8rem;
+        padding: 0.55rem 0.7rem;
+        min-height: 2.4rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.95rem;
+        white-space: pre;
+        overflow: hidden;
+      }
+      .caret {
+        display: inline-block;
+        width: 1px;
+        height: 1.05em;
+        translate: 0 0.18em;
+        background: var(--accent);
+      }
+      .lane[data-typing="true"] .caret {
+        animation: blink 1s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      .lane-step {
+        margin-top: 0.6rem;
+        font-size: 0.9rem;
+        color: var(--text-dim);
+        min-height: 1.4em;
+      }
+      .lane-bar {
+        margin-top: 0.5rem;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--border);
+        overflow: hidden;
+      }
+      .lane-bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+      }
+      .lane-tally {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.6rem;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        font-variant-numeric: tabular-nums;
+      }
+      .race-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1.2rem;
+      }
+      .verdict {
+        color: var(--accent);
+        font-weight: 500;
+      }
+      button.btn {
+        font: inherit;
+        cursor: pointer;
+        background: var(--surface);
+      }
+
       footer {
         margin-top: 4rem;
         padding-top: 1.5rem;
@@ -174,6 +280,55 @@
         the extension is installed, because a web page is not allowed to draw on or click
         inside another site. Download it above, then follow
         <a href="#install">Install it</a>.
+      </p>
+
+      <h2 id="race-heading">Two keystrokes, or seven</h2>
+      <p>
+        The same destination, Instagram, reached both ways. Play it and watch the
+        clocks.
+      </p>
+
+      <div class="race" id="race">
+        <div class="lane" data-lane="nav">
+          <div class="lane-head">
+            <span class="lane-name">Predictive Nav</span>
+            <span class="lane-clock">0.00s</span>
+          </div>
+          <div class="lane-screen"><span class="lane-typed"></span><b class="caret"></b></div>
+          <div class="lane-step">ready</div>
+          <div class="lane-bar"><i></i></div>
+          <div class="lane-tally"><span class="keys">0 keystrokes</span><span class="clicks">0 clicks</span></div>
+        </div>
+
+        <div class="lane" data-lane="google">
+          <div class="lane-head">
+            <span class="lane-name">Google</span>
+            <span class="lane-clock">0.00s</span>
+          </div>
+          <div class="lane-screen"><span class="lane-typed"></span><b class="caret"></b></div>
+          <div class="lane-step">ready</div>
+          <div class="lane-bar"><i></i></div>
+          <div class="lane-tally"><span class="keys">0 keystrokes</span><span class="clicks">0 clicks</span></div>
+        </div>
+      </div>
+
+      <p class="race-controls">
+        <button class="btn" id="replay" type="button">Play again</button>
+        <span id="verdict" class="verdict"></span>
+      </p>
+
+      <p class="note">
+        Timed from assumptions you can check, not from a stopwatch: 180&nbsp;ms per
+        keystroke (an average typist), 600&nbsp;ms for a page to load, 700&nbsp;ms to
+        read a results page and find the right link. Change those and the gap moves —
+        the shape does not.
+      </p>
+      <p class="note">
+        One caveat this page owes you: measured against Chrome's own address bar,
+        for a site already in your history, the gap is far smaller. Chrome
+        autocompletes and quietly preloads the page, so Enter is nearly free. The
+        two seconds below are real if your habit is to search for sites by name —
+        which is most people's — and much less if it is not.
       </p>
 
       <h2>What it does</h2>
@@ -273,5 +428,129 @@ node --test test/*.test.mjs</code></pre>
         origin. 60 unit tests.
       </footer>
     </main>
+
+    <script>
+      /**
+       * Plays both routes to Instagram on one clock.
+       *
+       * Every duration below is an assumption stated on the page rather than a
+       * measurement, so the animation can be checked by arithmetic instead of
+       * taken on trust.
+       */
+      (() => {
+        const KEY = 180; // one keystroke, average typist
+        const LOAD = 600; // a page appearing
+        const SCAN = 700; // reading a results page for the right link
+        const CLICK = 150; // moving to a link and pressing it
+
+        const key = (ch) => ({ ms: KEY, type: "key", ch, label: `type “${ch}”` });
+        const ROUTES = {
+          nav: [
+            key("i"),
+            key("n"),
+            { ms: 200, label: "predicts instagram" },
+            { ms: LOAD, label: "instagram.com loads" },
+          ],
+          google: [
+            key("i"),
+            key("n"),
+            key("s"),
+            key("t"),
+            key("a"),
+            { ms: KEY, type: "key", label: "press Enter" },
+            { ms: LOAD, label: "results load" },
+            { ms: SCAN, label: "find the link" },
+            { ms: CLICK, type: "click", label: "click it" },
+            { ms: LOAD, label: "instagram.com loads" },
+          ],
+        };
+
+        const total = (steps) => steps.reduce((sum, s) => sum + s.ms, 0);
+        const lanes = [...document.querySelectorAll(".lane")].map((el) => ({
+          el,
+          steps: ROUTES[el.dataset.lane],
+          parts: {
+            clock: el.querySelector(".lane-clock"),
+            typed: el.querySelector(".lane-typed"),
+            step: el.querySelector(".lane-step"),
+            bar: el.querySelector(".lane-bar i"),
+            keys: el.querySelector(".keys"),
+            clicks: el.querySelector(".clicks"),
+          },
+          finish: total(ROUTES[el.dataset.lane]),
+        }));
+
+        const longest = Math.max(...lanes.map((l) => l.finish));
+        const verdict = document.getElementById("verdict");
+        const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+        /** Draw one lane as it stands `elapsed` ms into the run. */
+        function draw(lane, elapsed) {
+          const at = Math.min(elapsed, lane.finish);
+          let seen = 0;
+          let typed = "";
+          let keys = 0;
+          let clicks = 0;
+          let label = "done";
+
+          for (const step of lane.steps) {
+            const complete = at >= seen + step.ms;
+            if (complete) {
+              if (step.ch) typed += step.ch;
+              if (step.type === "key") keys++;
+              if (step.type === "click") clicks++;
+            } else if (at >= seen) {
+              label = step.label;
+              break;
+            }
+            seen += step.ms;
+          }
+
+          lane.el.dataset.done = String(at >= lane.finish);
+          lane.el.dataset.typing = String(at < lane.finish);
+          lane.parts.clock.textContent = `${(at / 1000).toFixed(2)}s`;
+          lane.parts.typed.textContent = typed;
+          lane.parts.step.textContent = at >= lane.finish ? "arrived" : label;
+          lane.parts.bar.style.width = `${(at / lane.finish) * 100}%`;
+          lane.parts.keys.textContent = plural(keys, "keystroke");
+          lane.parts.clicks.textContent = plural(clicks, "click");
+        }
+
+        function settle() {
+          const [fast, slow] = [...lanes].sort((a, b) => a.finish - b.finish);
+          const saved = ((slow.finish - fast.finish) / 1000).toFixed(1);
+          verdict.textContent = `${saved}s and 4 keystrokes shorter`;
+        }
+
+        let running = null;
+        function play() {
+          cancelAnimationFrame(running);
+          verdict.textContent = "";
+          const started = performance.now();
+          const tick = (now) => {
+            const elapsed = now - started;
+            for (const lane of lanes) draw(lane, elapsed);
+            if (elapsed < longest) running = requestAnimationFrame(tick);
+            else settle();
+          };
+          running = requestAnimationFrame(tick);
+        }
+
+        document.getElementById("replay").addEventListener("click", play);
+
+        // Someone who asked for less motion still gets the numbers, just not
+        // the animation.
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          for (const lane of lanes) draw(lane, lane.finish);
+          settle();
+        } else {
+          new IntersectionObserver((entries, self) => {
+            if (!entries.some((e) => e.isIntersecting)) return;
+            self.disconnect();
+            play();
+          }).observe(document.getElementById("race"));
+        }
+      })();
+    </script>
   </body>
 </html>

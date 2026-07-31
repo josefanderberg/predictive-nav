@@ -19,8 +19,13 @@ import { isBounce, addRejection, rejectedFor } from "../extension/js/memory.js";
  * whole class. These tests hold that line.
  */
 
-/** Mirrors mayAutoSearch in main.js: a space cannot occur in a hostname. */
-const mayAutoSearch = (query) => /\s/.test(query.trim());
+/** Mirrors autoSearchDelay in main.js. */
+function autoSearchDelay(query) {
+  const q = query.trim();
+  if (q.includes(".")) return null;
+  if (/\s/.test(q)) return 900;
+  return 1500;
+}
 
 /** Mirrors resolveIntent's decision, without the DOM. */
 function classify(query) {
@@ -32,16 +37,28 @@ function classify(query) {
   }
   if (query.trim().length < 3) return { type: "none", armed: false };
 
-  return { type: "search", armed: mayAutoSearch(query) };
+  const delay = autoSearchDelay(query);
+  return { type: "search", armed: delay !== null, delay };
 }
 
 const keystrokes = (text) =>
   [...text].map((_, i) => text.slice(0, i + 1)).map((s) => ({ typed: s, ...classify(s) }));
 
-test("no keystroke of a new address arms a search", () => {
+test("no keystroke of a new address can fire while you are still typing", () => {
+  // Two defences, and every intermediate state must have one of them: once a
+  // dot appears nothing fires at all, and before that the wait is far longer
+  // than the gap between keystrokes (~180ms for an average typist).
+  const TYPING_GAP_MS = 180;
   for (const step of keystrokes("vadkul.se")) {
     if (step.type !== "search") continue;
-    assert.equal(step.armed, false, `"${step.typed}" must not auto-search mid-address`);
+    if (step.typed.includes(".")) {
+      assert.equal(step.armed, false, `"${step.typed}" is mid-address and must never fire`);
+    } else {
+      assert.ok(
+        step.delay >= TYPING_GAP_MS * 5,
+        `"${step.typed}" waits ${step.delay}ms — too short to survive typing`
+      );
+    }
   }
 });
 
@@ -51,12 +68,11 @@ test("the finished address is still recognised and committed", () => {
   assert.ok(last.armed);
 });
 
-test("longer and deeper addresses are equally safe", () => {
+test("once a dot is typed, nothing fires until the address is finished", () => {
   for (const address of ["intranet.corp.example", "vadkul.se/events", "min-sida.nu"]) {
     for (const step of keystrokes(address)) {
-      if (step.type === "search") {
-        assert.equal(step.armed, false, `"${step.typed}" in "${address}"`);
-      }
+      if (step.type !== "search" || !step.typed.includes(".")) continue;
+      assert.equal(step.armed, false, `"${step.typed}" in "${address}"`);
     }
   }
 });
@@ -69,11 +85,22 @@ test("a phrase searches on its own — a space rules out a hostname", () => {
   }
 });
 
-test("a single word waits for Enter — it may still become an address", () => {
-  for (const query of ["vadkul", "qqzx", "vadkul.s"]) {
+test("a lone word still searches by itself, just after a longer pause", () => {
+  for (const query of ["bkbpsk", "qqzx", "vadkul"]) {
     const final = classify(query);
     assert.equal(final.type, "search", query);
-    assert.equal(final.armed, false, `"${query}" could still be a domain in progress`);
+    assert.ok(final.armed, `"${query}" should not need Enter`);
+    assert.ok(final.delay > 900, "long enough that typing a domain never trips it");
+  }
+});
+
+test("anything with a dot never searches on its own", () => {
+  // A dot mid-word means an address is being typed. Firing here is what made
+  // adding a new site impossible.
+  for (const query of ["vadkul.", "vadkul.s", "min-sida."]) {
+    const final = classify(query);
+    assert.equal(final.type, "search", query);
+    assert.equal(final.armed, false, `"${query}" is mid-address`);
   }
 });
 
