@@ -348,7 +348,10 @@ function renderDiagnostics() {
  */
 function allowContentScriptsToReadOffers() {
   try {
-    chrome?.storage?.session
+    // globalThis.chrome, not bare chrome: Safari has no such global at all,
+    // and optional chaining does not save you from an undeclared identifier —
+    // it throws a ReferenceError before the ?. is ever reached.
+    globalThis.chrome?.storage?.session
       ?.setAccessLevel?.({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
       ?.catch(() => {});
   } catch {
@@ -548,7 +551,7 @@ function neighboursOf(site) {
 /** Hand the offer to the destination page, which renders it on arrival. */
 async function storeSwitchOffer(offer) {
   try {
-    await chrome?.storage?.session?.set({ switchOffer: offer });
+    await globalThis.chrome?.storage?.session?.set({ switchOffer: offer });
   } catch {
     // storage is best-effort; never block navigation on it
   }

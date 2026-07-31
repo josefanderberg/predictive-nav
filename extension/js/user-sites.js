@@ -36,11 +36,14 @@ export async function loadSites() {
 }
 
 async function fetchTopSites() {
-  if (typeof chrome === "undefined" || !chrome.topSites) return [];
+  // globalThis.chrome, because Safari has no such global and a bare reference
+  // throws a ReferenceError rather than reading as undefined.
+  const topSites = globalThis.chrome?.topSites;
+  if (!topSites) return [];
   try {
     // Callback-style Chrome builds return undefined here rather than a
     // promise, so this must never be assumed to be an array.
-    const sites = await chrome.topSites.get();
+    const sites = await topSites.get();
     return Array.isArray(sites) ? sites : [];
   } catch {
     return [];
