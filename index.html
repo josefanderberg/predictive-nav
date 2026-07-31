@@ -95,6 +95,9 @@
         max-width: 0;
         display: inline-block;
         white-space: nowrap;
+        /* padding-bottom prevents descenders (g, y, p…) from being clipped */
+        padding-bottom: 0.18em;
+        margin-bottom: -0.18em;
         transition: max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
           opacity 0.35s ease;
         vertical-align: baseline;
@@ -629,33 +632,25 @@ node --test test/*.test.mjs</code></pre>
           const navLetters = ["N", "a", "v"];
           let t = 250;
 
-          // 1. Type "Pre"
+          // 1. Type "Pre" and "Nav" simultaneously
           preLetters.forEach((ch, i) => {
             after(t + i * LETTER_MS, () => { elPre.textContent += ch; });
           });
-          t += preLetters.length * LETTER_MS;
-
-          // 2. Ghost "dictive" expands
-          after(t + GHOST_DELAY, () => {
-            elGhostPre.textContent = "dictive";
-            elGhostPre.style.maxWidth = "9em";
-          });
-          t += GHOST_DELAY + BETWEEN_WORDS;
-
-          // 3. Type "Nav"
           navLetters.forEach((ch, i) => {
             after(t + i * LETTER_MS, () => { elNav.textContent += ch; });
           });
-          t += navLetters.length * LETTER_MS;
+          t += preLetters.length * LETTER_MS;
 
-          // 4. Ghost "igation" expands
+          // 2. Both ghost texts expand at once
           after(t + GHOST_DELAY, () => {
+            elGhostPre.textContent = "dictive";
+            elGhostPre.style.maxWidth = "9em";
             elGhostNav.textContent = "igation";
             elGhostNav.style.maxWidth = "9em";
           });
           t += GHOST_DELAY;
 
-          // 5. Merge — collapse ghosts and close the space between words
+          // 3. Merge — collapse ghosts and close the space between words
           after(t + MERGE_DELAY, () => {
             elGhostPre.classList.add("collapsing");
             elGhostNav.classList.add("collapsing");
