@@ -114,6 +114,20 @@ test("known sites are untouched and still go instantly", () => {
   }
 });
 
+test("a leading space pauses everything — only Enter or a click decides", () => {
+  // Mirrors resolveIntent in main.js: the pause looks at the RAW input before
+  // trimming, so " blo" predicts blocket but must not fire on its own.
+  const paused = (raw) => /^\s/.test(raw);
+  for (const raw of [" blo", " am", " world war 2", " vadkul"]) {
+    assert.ok(paused(raw), `"${raw}" is paused`);
+    const armed = classify(raw.trim()).armed && !paused(raw);
+    assert.equal(armed, false, `"${raw}" must wait for Enter or a click`);
+  }
+  // And without the space, the same inputs behave as before.
+  assert.ok(classify("blo").armed, "blo still goes by itself");
+  assert.ok(!paused("blo"));
+});
+
 test("checking whether an address was saved must not blacklist it", () => {
   // Pressing Back is exactly how someone verifies "did it remember my site?".
   const typed = { kind: "url", query: "vadkul", name: "vadkul", at: 1000 };

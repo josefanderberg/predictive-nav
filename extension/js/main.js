@@ -483,8 +483,19 @@ function allowContentScriptsToReadOffers() {
 
 // --- intent resolution --------------------------------------------------
 
+/**
+ * A leading space means "let me think": predictions and suggestions still
+ * appear, but nothing fires on its own — only Enter or a click decides. The
+ * space bar is under your thumb and needs no hint to remember, which is what
+ * an escape hatch is for.
+ */
 function resolveIntent(text) {
-  const query = text.trim();
+  const intent = resolveIntentFor(text.trim());
+  if (!intent || intent.delay === null || !/^\s/.test(text)) return intent;
+  return { ...intent, delay: null, status: `${intent.status} · paused — Enter or a click goes` };
+}
+
+function resolveIntentFor(query) {
   if (!query) return null;
 
   if (looksLikeUrl(query)) {

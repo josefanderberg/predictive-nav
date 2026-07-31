@@ -69,7 +69,9 @@ Auto-navigation only fires when the guess is *unambiguous*:
 - an exactly typed name beats longer names containing it (`svt` ≠ `svtplay`)
 - typing silence: **450 ms** for a known site, **900 ms** for a search
   fallback (riskier, so you get more room to keep typing)
-- `Esc` pauses auto-navigation for the current input; `Enter` goes immediately
+- start the input with a space and nothing fires on its own — predictions
+  still appear, but only `Enter` or a click decides (`Esc` still cancels a
+  pending countdown)
 - set `AUTO_LUCKY = false` in `js/main.js` to require Enter for searches while
   keeping instant navigation for known sites
 

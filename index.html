@@ -365,7 +365,8 @@
       <p>
         Auto-navigation is only worth it if a bad guess costs nothing. So it only fires
         when the top candidate holds at least 75% of the matched score and beats the
-        runner-up by 1.5×; <kbd>Esc</kbd> pauses it; and on arrival the destination shows
+        runner-up by 1.5×; starting the input with a space pauses everything until
+        Enter or a click; and on arrival the destination shows
         a five-second overlay with the runners-up and a search row, so switching is one
         click rather than a back-button round trip.
       </p>
@@ -417,7 +418,7 @@ node --test test/*.test.mjs</code></pre>
         Chrome already prerenders its address-bar predictions, so what this removes is
         roughly 200–400 ms per navigation. At about 3 seconds to recover from a wrong
         guess, it has to be right well above 90% of the time to break even — which is
-        exactly why the confidence thresholds, the <kbd>Esc</kbd> key and the
+        exactly why the confidence thresholds, the leading-space pause and the
         second-chance overlay exist. As a mass-market product the gap this fills exists
         on purpose. As a personal tool over your own twenty sites, the accuracy is high
         enough that it pays for itself.
