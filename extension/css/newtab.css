@@ -51,20 +51,27 @@ body {
   box-shadow: 0 4px 24px rgb(0 0 0 / 0.25);
 }
 
+/* The ghost sits exactly under the input and must line up to the pixel: the
+   characters you have typed are drawn twice, once by each, so any difference
+   in box metrics reads as doubled text. That includes the input's focus
+   border, which the ghost has to carry as a transparent one of its own. */
 .bar input,
 .ghost {
   width: 100%;
   padding: 1.1rem 3.2rem 1.1rem 1.4rem;
+  border: 2px solid transparent;
   /* Never below 16px: iOS zooms the page in on any smaller focused field. */
   font-size: clamp(1rem, 4.5vw, 1.5rem);
   font-family: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.4;
   text-align: left;
 }
 
 .bar input {
   position: relative;
   background: transparent;
-  border: 2px solid transparent;
   border-radius: 14px;
   color: var(--text);
   outline: none;

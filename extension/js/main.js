@@ -48,19 +48,21 @@ const PROVIDER = PROVIDERS.google;
  */
 const JUMP_TO_FIRST_RESULT = false;
 /**
- * Whether a search fires on its own, or waits for Enter.
+ * Whether a search may fire on its own, given what has been typed.
  *
- * Off. The early letters of a domain are indistinguishable from a word — at
- * "vadkul" nothing yet says an address is coming — so any auto-search timer
- * eventually fires mid-hostname and takes the page away before the address
- * exists. Guarding on the dot only covers the tail of the problem.
+ * A space settles it. Hostnames cannot contain one, so "world war 2" is
+ * unambiguously a thing to look up and can go by itself. A single word cannot
+ * be told apart from a domain still being typed — at "vadkul" nothing yet says
+ * ".se" is coming — and a timer armed there fires mid-hostname and takes the
+ * page away before the address exists, which is precisely how typing a new
+ * site used to become impossible.
  *
- * Little is lost: auto-commit earns its keep by reaching a known site without
- * a keystroke, whereas a search still leaves you a page to read and choose
- * from, so pressing Enter costs one key and removes an entire class of
- * misfire. Known sites are unaffected and still go instantly.
+ * So phrases search on their own and single words wait for Enter. That is one
+ * keystroke on the ambiguous case, and it buys back the whole class of misfire.
  */
-const AUTO_LUCKY = false;
+function mayAutoSearch(query) {
+  return /\s/.test(query.trim());
+}
 
 const COMMIT_DELAY_MS = 450; // known site: high confidence, go quickly
 /**
@@ -401,23 +403,17 @@ function resolveIntent(text) {
     return { type: "none", url: null, status: "Keep typing…", candidates: [], delay: null };
   }
 
-  // An address is only recognised once it ends in a real suffix, so every
-  // keystroke of "vadkul.se" before the final "e" looks like a search. Arming
-  // the timer through those states means one pause mid-domain fires a search
-  // for half a hostname — and takes the page away before the address exists.
-  const typingAddress = !/\s/.test(query) && query.includes(".");
+  const auto = mayAutoSearch(query);
 
   return {
     type: "lucky",
     url: JUMP_TO_FIRST_RESULT ? PROVIDER.lucky(query) : PROVIDER.search(query),
     query,
-    status: typingAddress
-      ? `Finish the address, or press Enter to search for “${query}”`
-      : JUMP_TO_FIRST_RESULT
-        ? `First result for “${query}” — skips the ads · ${PROVIDER.label}`
-        : `Search ${PROVIDER.label} for “${query}”`,
+    status: auto
+      ? `Search ${PROVIDER.label} for “${query}”`
+      : `Press Enter to search ${PROVIDER.label} for “${query}”`,
     candidates: [],
-    delay: AUTO_LUCKY && !typingAddress ? LUCKY_DELAY_MS : null,
+    delay: auto ? LUCKY_DELAY_MS : null,
   };
 }
 

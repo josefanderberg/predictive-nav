@@ -19,8 +19,8 @@ import { isBounce, addRejection, rejectedFor } from "../extension/js/memory.js";
  * whole class. These tests hold that line.
  */
 
-/** Whether a search may fire on its own — mirrors AUTO_LUCKY in main.js. */
-const AUTO_SEARCH = false;
+/** Mirrors mayAutoSearch in main.js: a space cannot occur in a hostname. */
+const mayAutoSearch = (query) => /\s/.test(query.trim());
 
 /** Mirrors resolveIntent's decision, without the DOM. */
 function classify(query) {
@@ -32,8 +32,7 @@ function classify(query) {
   }
   if (query.trim().length < 3) return { type: "none", armed: false };
 
-  const typingAddress = !/\s/.test(query) && query.includes(".");
-  return { type: "search", armed: AUTO_SEARCH && !typingAddress };
+  return { type: "search", armed: mayAutoSearch(query) };
 }
 
 const keystrokes = (text) =>
@@ -62,11 +61,19 @@ test("longer and deeper addresses are equally safe", () => {
   }
 });
 
-test("a search never fires on its own — Enter decides", () => {
-  for (const query of ["world war 2", "vad kostar en tesla", "vadkul", "qqzx"]) {
+test("a phrase searches on its own — a space rules out a hostname", () => {
+  for (const query of ["world war 2", "vad kostar en tesla", "hur lagar man pannkakor"]) {
     const final = classify(query);
     assert.equal(final.type, "search", query);
-    assert.equal(final.armed, false, `"${query}" must wait for Enter`);
+    assert.equal(final.armed, true, `"${query}" should auto-search`);
+  }
+});
+
+test("a single word waits for Enter — it may still become an address", () => {
+  for (const query of ["vadkul", "qqzx", "vadkul.s"]) {
+    const final = classify(query);
+    assert.equal(final.type, "search", query);
+    assert.equal(final.armed, false, `"${query}" could still be a domain in progress`);
   }
 });
 
