@@ -90,46 +90,37 @@ body {
   overflow: hidden;
 }
 
-.ring {
+/* Fills across the bottom of the bar while it counts down, so the wait before
+   it moves is something you watch rather than something that surprises you. */
+.progress {
   position: absolute;
-  right: 1rem;
-  top: 50%;
-  width: 28px;
-  height: 28px;
-  translate: 0 -50%;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
   opacity: 0;
 }
 
-.ring.active {
+.progress.active {
   opacity: 1;
 }
 
-.ring circle {
-  fill: none;
-  stroke-width: 3;
+.progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
 }
 
-.ring-track {
-  stroke: var(--text-dim);
-  opacity: 0.3;
+.progress.active i {
+  animation: fill-bar var(--commit-ms, 450ms) linear forwards;
 }
 
-.ring-fill {
-  stroke: var(--accent);
-  stroke-linecap: round;
-  stroke-dasharray: 56.5; /* 2πr, r=9 */
-  stroke-dashoffset: 56.5;
-  transform: rotate(-90deg);
-  transform-origin: center;
-}
-
-.ring.active .ring-fill {
-  animation: fill-ring var(--commit-ms) linear forwards;
-}
-
-@keyframes fill-ring {
+@keyframes fill-bar {
   to {
-    stroke-dashoffset: 0;
+    width: 100%;
   }
 }
 
@@ -239,6 +230,34 @@ kbd {
   font-size: 0.75rem;
   color: var(--text-dim);
   opacity: 0.7;
+}
+
+.settings {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+  justify-items: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.settings[hidden] {
+  display: none;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.setting select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border, #333);
+  border-radius: 7px;
+  padding: 0.25rem 0.45rem;
 }
 
 .diagnostics.error {

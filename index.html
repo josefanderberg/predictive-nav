@@ -530,13 +530,28 @@ node --test test/*.test.mjs</code></pre>
           const tick = (now) => {
             const elapsed = now - started;
             for (const lane of lanes) draw(lane, elapsed);
-            if (elapsed < longest) running = requestAnimationFrame(tick);
-            else settle();
+            if (elapsed < longest) {
+              running = requestAnimationFrame(tick);
+            } else {
+              running = null;
+              settle();
+            }
           };
           running = requestAnimationFrame(tick);
         }
 
         document.getElementById("replay").addEventListener("click", play);
+
+        // A hidden tab stops serving animation frames, which would otherwise
+        // leave the run frozen part-way with a clock that lies. Jump it to the
+        // end instead: the numbers are the point, the motion is decoration.
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden || running === null) return;
+          cancelAnimationFrame(running);
+          running = null;
+          for (const lane of lanes) draw(lane, lane.finish);
+          settle();
+        });
 
         // Someone who asked for less motion still gets the numbers, just not
         // the animation.

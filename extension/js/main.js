@@ -89,10 +89,13 @@ const els = {
   input: document.getElementById("nav-input"),
   ghost: document.getElementById("ghost"),
   status: document.getElementById("status"),
-  ring: document.getElementById("ring"),
+  progress: document.getElementById("progress"),
   banner: document.getElementById("banner"),
   suggestions: document.getElementById("suggestions"),
   diagnostics: document.getElementById("diagnostics"),
+  settings: document.getElementById("settings"),
+  speed: document.getElementById("setting-speed"),
+  yours: document.getElementById("setting-yours"),
 };
 
 const state = {
@@ -106,8 +109,13 @@ const state = {
   visits: {},
   /** site name -> address this person typed out themselves */
   custom: {},
-  /** whether an empty bar lists your sites, or stays bare */
-  showYours: true,
+  /**
+   * Whether an empty bar lists your sites. Off: a new tab should be bare, and
+   * the list is a thing to turn on rather than something to dismiss.
+   */
+  showYours: false,
+  /** multiplies every commit delay — 1 is as fast as it goes */
+  speed: 1,
   /** where what we learn is kept — see store.js */
   store: null,
 };
@@ -135,6 +143,7 @@ async function init() {
     const { SEED_SITES } = await import("./sites.js");
     state.sites = personalise(SEED_SITES);
   }
+  initSettings();
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
 }
@@ -152,12 +161,20 @@ async function learnFromLastVisit() {
   if (!local || local.kind === "none") return;
 
   try {
-    const stored = await local.get(["lastGuess", "rejections", "visits", "custom", "showYours"]);
+    const stored = await local.get([
+      "lastGuess",
+      "rejections",
+      "visits",
+      "custom",
+      "showYours",
+      "speed",
+    ]);
     const { lastGuess } = stored;
     state.rejections = stored.rejections ?? {};
     state.visits = stored.visits ?? {};
     state.custom = stored.custom ?? {};
-    state.showYours = stored.showYours ?? true;
+    state.showYours = stored.showYours ?? false;
+    state.speed = Number(stored.speed) || 1;
     if (!lastGuess) return;
 
     const how = navigationType(performance.getEntriesByType("navigation"));
@@ -177,12 +194,41 @@ async function learnFromLastVisit() {
   }
 }
 
-/** Show or hide the list under an empty bar, and remember which you chose. */
-function setShowYours(show) {
-  state.showYours = show;
+/**
+ * Every wait, stretched by the chosen speed.
+ *
+ * One dial rather than four: the delays are already tuned relative to each
+ * other, and what differs between people is how much room they want overall.
+ * Someone who types slowly, or wants a beat to change their mind, moves them
+ * all at once and keeps the balance.
+ */
+const scaled = (ms) => Math.round(ms * state.speed);
+
+/** Reflect the stored preferences in the controls, and wire them up once. */
+function initSettings() {
+  els.speed.value = String(state.speed);
+  els.yours.checked = state.showYours;
+
+  els.speed.addEventListener("change", () => {
+    state.speed = Number(els.speed.value) || 1;
+    save({ speed: state.speed });
+    onInput(); // re-arm anything pending at the new pace
+  });
+
+  els.yours.addEventListener("change", () => {
+    state.showYours = els.yours.checked;
+    save({ showYours: state.showYours });
+    if (!els.input.value.trim()) renderSuggestions(yourSites());
+  });
+}
+
+function toggleSettings() {
+  els.settings.hidden = !els.settings.hidden;
   renderDiagnostics();
-  if (!els.input.value.trim()) renderSuggestions(yourSites());
-  state.store?.set({ showYours: show }).catch(() => {
+}
+
+function save(values) {
+  state.store?.set(values).catch(() => {
     // a preference is not worth failing over
   });
 }
@@ -335,10 +381,10 @@ function renderDiagnostics() {
   const count = document.createElement("a");
   count.href = "#";
   count.textContent = `${state.sites.length} sites · ${yours} yours`;
-  count.title = state.showYours ? "Hide your sites" : "Show your sites";
+  count.title = "Settings";
   count.addEventListener("click", (event) => {
     event.preventDefault();
-    setShowYours(!state.showYours);
+    toggleSettings();
   });
   els.diagnostics.append(count);
   if (parts.length > 0) els.diagnostics.append(document.createTextNode(` · ${parts.join(" · ")}`));
@@ -378,7 +424,7 @@ function resolveIntent(text) {
 
   if (looksLikeUrl(query)) {
     const url = toDirectUrl(query);
-    return { type: "url", url, status: `${url} — typed address`, candidates: [], delay: COMMIT_DELAY_MS };
+    return { type: "url", url, status: `${url} — typed address`, candidates: [], delay: scaled(COMMIT_DELAY_MS) };
   }
 
   const prediction = predict(query, state.sites, {
@@ -402,9 +448,7 @@ function resolveIntent(text) {
       query,
       delay: prediction.kind !== "commit"
         ? null
-        : prediction.candidates.length === 1
-          ? SOLE_MATCH_DELAY_MS
-          : COMMIT_DELAY_MS,
+        : scaled(prediction.candidates.length === 1 ? SOLE_MATCH_DELAY_MS : COMMIT_DELAY_MS),
     };
   }
 
@@ -413,6 +457,7 @@ function resolveIntent(text) {
   }
 
   const delay = autoSearchDelay(query);
+  const armed = delay === null ? null : scaled(delay);
 
   return {
     type: "lucky",
@@ -422,7 +467,7 @@ function resolveIntent(text) {
       ? `Search ${PROVIDER.label} for “${query}”`
       : `Finish the address, or press Enter to search for “${query}”`,
     candidates: [],
-    delay,
+    delay: armed,
   };
 }
 
@@ -463,8 +508,11 @@ function onKeyDown(event) {
 
 function scheduleCommit(intent) {
   state.intent = intent;
-  els.ring.style.setProperty("--commit-ms", `${intent.delay}ms`);
-  els.ring.classList.add("active");
+  els.progress.style.setProperty("--commit-ms", `${intent.delay}ms`);
+  // Restart the fill from zero even if the previous one had not finished.
+  els.progress.classList.remove("active");
+  void els.progress.offsetWidth;
+  els.progress.classList.add("active");
   state.timer = setTimeout(() => navigateTo(intent.url, intent), intent.delay);
 }
 
@@ -472,7 +520,7 @@ function cancelPendingCommit() {
   clearTimeout(state.timer);
   state.timer = null;
   state.intent = null;
-  els.ring.classList.remove("active");
+  els.progress.classList.remove("active");
 }
 
 async function navigateTo(url, intent = null) {

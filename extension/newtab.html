@@ -25,25 +25,38 @@
           placeholder="Start typing a site or a search…"
           aria-label="Type a site name or a search query"
         />
-        <svg id="ring" class="ring" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="ring-track" cx="12" cy="12" r="9" />
-          <circle class="ring-fill" cx="12" cy="12" r="9" />
-        </svg>
+        <div class="progress" id="progress" aria-hidden="true"><i></i></div>
       </div>
 
       <ul class="suggestions" id="suggestions"></ul>
 
       <p class="status" id="status" role="status"></p>
       <p class="hint">
-        Known sites go instantly · anything else jumps to the first result, past
-        the ads<span class="hint-keys"> · <kbd>Esc</kbd> pauses ·
-          <kbd>Enter</kbd> goes now</span
+        Known sites go instantly · anything else becomes a search<span
+          class="hint-keys"
+        >
+          · <kbd>Esc</kbd> pauses · <kbd>Enter</kbd> goes now</span
         ><span class="hint-touch"> · tap anywhere to start typing</span>
       </p>
 
       <div class="banner" id="banner" role="alert"></div>
 
       <p class="diagnostics" id="diagnostics"></p>
+
+      <div class="settings" id="settings" hidden>
+        <label class="setting">
+          <span>Speed</span>
+          <select id="setting-speed">
+            <option value="1">Fast — go as soon as it is sure</option>
+            <option value="2">Relaxed — a moment to change your mind</option>
+            <option value="3.5">Slow — plenty of time to keep typing</option>
+          </select>
+        </label>
+        <label class="setting">
+          <input type="checkbox" id="setting-yours" />
+          <span>List your sites under an empty bar</span>
+        </label>
+      </div>
     </main>
 
     <script type="module" src="js/main.js"></script>
