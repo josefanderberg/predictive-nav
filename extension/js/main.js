@@ -21,6 +21,7 @@ import { resolveRegionalUrl } from "./sites.js";
 import { loadSites } from "./user-sites.js";
 import { PROVIDERS, looksLikeUrl, toDirectUrl } from "./lucky.js";
 import { buildOffer } from "./switcher.js";
+import { openStore } from "./store.js";
 import {
   isBounce,
   addRejection,
@@ -96,6 +97,8 @@ const state = {
   custom: {},
   /** whether an empty bar lists your sites, or stays bare */
   showYours: true,
+  /** where what we learn is kept — see store.js */
+  store: null,
 };
 
 const DEMO_MODE = new URLSearchParams(location.search).has("demo");
@@ -111,6 +114,7 @@ async function init() {
   if (DEMO_MODE) setStatus("Demo mode: navigation is simulated.");
   renderDiagnostics();
 
+  state.store = openStore();
   allowContentScriptsToReadOffers();
   await learnFromLastVisit();
 
@@ -133,8 +137,8 @@ async function init() {
  * gets a working bar, just one that cannot learn.
  */
 async function learnFromLastVisit() {
-  const local = chrome?.storage?.local;
-  if (!local) return;
+  const local = state.store;
+  if (!local || local.kind === "none") return;
 
   try {
     const stored = await local.get(["lastGuess", "rejections", "visits", "custom", "showYours"]);
@@ -167,11 +171,9 @@ function setShowYours(show) {
   state.showYours = show;
   renderDiagnostics();
   if (!els.input.value.trim()) renderSuggestions(yourSites());
-  try {
-    chrome?.storage?.local?.set({ showYours: show });
-  } catch {
+  state.store?.set({ showYours: show }).catch(() => {
     // a preference is not worth failing over
-  }
+  });
 }
 
 /** The catalog with this person's own addresses folded in and their habits applied. */
@@ -207,8 +209,8 @@ function yourSites() {
  * it competes like anything else.
  */
 async function rememberGuess(intent, url) {
-  const local = chrome?.storage?.local;
-  if (!local) return;
+  const local = state.store;
+  if (!local || local.kind === "none") return;
 
   try {
     if (intent?.type === "site" && intent.site) {
@@ -301,31 +303,34 @@ function renderDiagnostics() {
 
   if (DEMO_MODE) parts.push("demo mode — nothing navigates and nothing is remembered");
   else if (!isExtension)
-    parts.push("web page — navigates, but cannot remember sites or show the arrival overlay");
+    parts.push("web page — learns your sites here, but the arrival overlay needs the extension");
 
   els.diagnostics.replaceChildren();
   els.diagnostics.classList.toggle("error", !isExtension && !DEMO_MODE);
 
-  // Outside the extension there is no storage, so "0 yours" is not a count of
-  // anything — it reads as "you have none" when the truth is that nothing can
-  // be counted here. Show the catalog size alone and let the note explain.
-  if (!isExtension) {
-    els.diagnostics.append(document.createTextNode([`${state.sites.length} sites`, ...parts].join(" · ")));
-  } else {
-    // The catalog total is a guess about everyone; the count that matters is
-    // how much has become this person's — and it doubles as the switch for the
-    // list, so controlling it needs no button of its own on a bare page.
-    const count = document.createElement("a");
-    count.href = "#";
-    count.textContent = `${state.sites.length} sites · ${yours} yours`;
-    count.title = state.showYours ? "Hide your sites" : "Show your sites";
-    count.addEventListener("click", (event) => {
-      event.preventDefault();
-      setShowYours(!state.showYours);
-    });
-    els.diagnostics.append(count);
-    if (parts.length > 0) els.diagnostics.append(document.createTextNode(` · ${parts.join(" · ")}`));
+  // Only show a learned count where one can actually be kept: printed in a
+  // context that cannot store anything, "0 yours" reads as "you have none"
+  // rather than "this cannot count".
+  if (state.store?.kind === "none") {
+    els.diagnostics.append(
+      document.createTextNode([`${state.sites.length} sites`, ...parts].join(" · "))
+    );
+    return;
   }
+
+  // The catalog total is a guess about everyone; the count that matters is how
+  // much has become this person's — and it doubles as the switch for the list,
+  // so controlling it needs no button of its own on a bare page.
+  const count = document.createElement("a");
+  count.href = "#";
+  count.textContent = `${state.sites.length} sites · ${yours} yours`;
+  count.title = state.showYours ? "Hide your sites" : "Show your sites";
+  count.addEventListener("click", (event) => {
+    event.preventDefault();
+    setShowYours(!state.showYours);
+  });
+  els.diagnostics.append(count);
+  if (parts.length > 0) els.diagnostics.append(document.createTextNode(` · ${parts.join(" · ")}`));
 
   if (!DEMO_MODE) return;
   const real = new URL(location.href);
