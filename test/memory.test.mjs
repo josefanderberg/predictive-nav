@@ -17,6 +17,8 @@ import {
   addCustomSite,
   removeCustomSite,
   mergeCustomSites,
+  toggleHidden,
+  applyHidden,
 } from "../extension/js/memory.js";
 import { predict } from "../extension/js/predictor.js";
 import { SEED_SITES } from "../extension/js/sites.js";
@@ -240,6 +242,26 @@ test("remembered addresses can be forgotten, and the catalog is never mutated", 
   assert.equal(mergeCustomSites(catalog, {}), catalog, "nothing added, nothing copied");
   assert.deepEqual(removeCustomSite(custom, "vadkul"), {});
   assert.equal(removeCustomSite(custom, "never-added"), custom);
+});
+
+test("hiding a catalog site removes it from ranking, reversibly", () => {
+  const sites = [
+    { name: "wolt", weight: 48, url: "https://wolt.com/sv" },
+    { name: "wordpress", weight: 40, url: "https://wordpress.com" },
+  ];
+  let hidden = toggleHidden([], "wolt");
+  assert.deepEqual(hidden, ["wolt"]);
+
+  const filtered = applyHidden(sites, hidden);
+  assert.deepEqual(filtered.map((s) => s.name), ["wordpress"]);
+  assert.equal(predict("wo", filtered).site.name, "wordpress", "the prefix goes elsewhere");
+  assert.equal(sites.length, 2, "the underlying catalog is untouched");
+
+  hidden = toggleHidden(hidden, "wolt"); // restore
+  assert.deepEqual(hidden, []);
+  assert.equal(applyHidden(sites, hidden), sites, "no hidden, no copy");
+  assert.equal(applyHidden(sites, undefined), sites);
+  assert.equal(toggleHidden(["wolt"], "").length, 1, "junk names change nothing");
 });
 
 test("the user's scenario: wo stops going to wolt, but wolt still does", () => {

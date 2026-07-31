@@ -33,6 +33,8 @@ import {
   trustedSites,
   addCustomSite,
   removeCustomSite,
+  toggleHidden,
+  applyHidden,
   mergeCustomSites,
   siteNameFromUrl,
 } from "./memory.js";
@@ -98,7 +100,14 @@ const els = {
   speed: document.getElementById("setting-speed"),
   yours: document.getElementById("setting-yours"),
   counts: document.getElementById("setting-counts"),
-  yourSitesList: document.getElementById("setting-sites"),
+  openManager: document.getElementById("open-manager"),
+  manager: document.getElementById("site-manager"),
+  managerCount: document.getElementById("manager-count"),
+  managerClose: document.getElementById("manager-close"),
+  managerAddForm: document.getElementById("manager-add-form"),
+  managerAdd: document.getElementById("manager-add"),
+  managerFilter: document.getElementById("manager-filter"),
+  managerList: document.getElementById("manager-list"),
 };
 
 const state = {
@@ -114,6 +123,8 @@ const state = {
   visits: {},
   /** site name -> address this person typed out themselves */
   custom: {},
+  /** catalog names this person has hidden — see memory.js */
+  hidden: [],
   /**
    * Whether an empty bar lists your sites. Off: a new tab should be bare, and
    * the list is a thing to turn on rather than something to dismiss.
@@ -196,6 +207,7 @@ async function learnFromLastVisit(howOverride) {
       "rejections",
       "visits",
       "custom",
+      "hidden",
       "showYours",
       "speed",
     ]);
@@ -203,6 +215,7 @@ async function learnFromLastVisit(howOverride) {
     state.rejections = stored.rejections ?? {};
     state.visits = stored.visits ?? {};
     state.custom = stored.custom ?? {};
+    state.hidden = Array.isArray(stored.hidden) ? stored.hidden : [];
     state.showYours = stored.showYours ?? false;
     state.speed = Number(stored.speed) || 1;
     if (!lastGuess) return;
@@ -250,6 +263,18 @@ function initSettings() {
     save({ showYours: state.showYours });
     if (!els.input.value.trim()) renderSuggestions(yourSites());
   });
+
+  els.openManager.addEventListener("click", openManager);
+  els.managerClose.addEventListener("click", closeManager);
+  els.managerAddForm.addEventListener("submit", addFromManager);
+  els.managerAdd.addEventListener("input", () => els.managerAdd.setCustomValidity(""));
+  els.managerFilter.addEventListener("input", () => renderManager());
+  els.manager.addEventListener("click", (event) => {
+    if (event.target === els.manager) closeManager(); // the backdrop, not the panel
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.manager.hidden) closeManager();
+  });
 }
 
 function toggleSettings() {
@@ -258,47 +283,132 @@ function toggleSettings() {
   renderDiagnostics();
 }
 
-/**
- * The numbers and the list of typed-in sites, shown where they can be acted
- * on. A removed site leaves the catalog immediately — the base list is kept
- * unpersonalised precisely so this rebuild restores it exactly.
- */
+/** The numbers, shown where they sit next to the things they describe. */
 function renderSettingsPanel() {
   const yours = learnedCount(state.visits);
-  els.counts.textContent = `${state.sites.length} sites in the catalog · ${yours} learned as yours`;
+  const bits = [`${state.sites.length} sites in the catalog`, `${yours} learned as yours`];
+  if (state.hidden.length > 0) bits.push(`${state.hidden.length} hidden`);
+  els.counts.textContent = bits.join(" \u00b7 ");
+}
 
-  const entries = Object.values(state.custom);
-  els.yourSitesList.replaceChildren();
-  if (entries.length === 0) return;
+// --- the site manager ---------------------------------------------------
 
-  const heading = document.createElement("p");
-  heading.className = "setting-sites-heading";
-  heading.textContent = "Sites you added";
-  els.yourSitesList.append(heading);
+function openManager() {
+  els.manager.hidden = false;
+  els.managerFilter.value = "";
+  renderManager();
+  els.managerAdd.focus();
+}
 
-  for (const site of entries) {
-    const row = document.createElement("div");
-    row.className = "setting-site";
+function closeManager() {
+  els.manager.hidden = true;
+  renderSettingsPanel();
+  els.input.focus({ preventScroll: true });
+}
 
-    const label = document.createElement("span");
-    label.textContent = site.name;
-    label.title = site.url;
+/** Rebuild the catalog after any change and repaint everything that shows it. */
+function catalogChanged() {
+  state.sites = personalise(state.baseSites);
+  renderManager();
+  renderSettingsPanel();
+  if (!els.input.value.trim()) renderSuggestions(yourSites());
+}
 
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "remove";
-    remove.setAttribute("aria-label", `Remove ${site.name}`);
-    remove.addEventListener("click", () => {
+/**
+ * One list, two sections: yours first (added by hand or learned from use),
+ * then the seed catalog. Hidden entries stay visible but greyed, because a
+ * removal you cannot see is a removal you cannot undo.
+ */
+function renderManager() {
+  const filter = els.managerFilter.value.trim().toLowerCase();
+  const all = mergeCustomSites(state.baseSites, state.custom);
+  const shown = filter
+    ? all.filter((s) => s.name.includes(filter) || s.url.toLowerCase().includes(filter))
+    : all;
+
+  const isYours = (s) => s.name in state.custom || (state.visits[s.name] ?? 0) > 0;
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const yours = shown.filter(isYours).sort((a, b) =>
+    (state.visits[b.name] ?? 0) - (state.visits[a.name] ?? 0) || byName(a, b));
+  const rest = shown.filter((s) => !isYours(s)).sort(byName);
+
+  els.managerCount.textContent =
+    `${all.length} sites \u00b7 ${Object.keys(state.custom).length} added \u00b7 ${state.hidden.length} hidden`;
+
+  els.managerList.replaceChildren();
+  const section = (title) => {
+    const h = document.createElement("p");
+    h.className = "modal-section";
+    h.textContent = title;
+    els.managerList.append(h);
+  };
+  if (yours.length > 0) {
+    section("Yours");
+    for (const site of yours) els.managerList.append(managerRow(site, true));
+  }
+  if (rest.length > 0) {
+    section("Catalog");
+    for (const site of rest) els.managerList.append(managerRow(site, false));
+  }
+}
+
+function managerRow(site, mine) {
+  const hidden = state.hidden.includes(site.name);
+  const row = document.createElement("div");
+  row.className = "site-row" + (hidden ? " is-hidden" : "");
+
+  const name = document.createElement("span");
+  name.className = "row-name";
+  name.textContent = site.name;
+
+  const url = document.createElement("span");
+  url.className = "row-url";
+  url.textContent = site.url.replace(/^https?:\/\//, "");
+
+  const meta = document.createElement("span");
+  meta.className = "row-meta";
+  const visits = state.visits[site.name] ?? 0;
+  if (site.name in state.custom) meta.textContent = "added by you";
+  else if (visits > 0) meta.textContent = `${visits} visit${visits === 1 ? "" : "s"}`;
+
+  const action = document.createElement("button");
+  action.type = "button";
+  if (site.name in state.custom) {
+    action.textContent = "remove";
+    action.addEventListener("click", () => {
       state.custom = removeCustomSite(state.custom, site.name);
       save({ custom: state.custom });
-      state.sites = personalise(state.baseSites);
-      renderSettingsPanel();
-      if (!els.input.value.trim()) renderSuggestions(yourSites());
+      catalogChanged();
     });
-
-    row.append(label, remove);
-    els.yourSitesList.append(row);
+  } else {
+    action.textContent = hidden ? "restore" : "hide";
+    action.addEventListener("click", () => {
+      state.hidden = toggleHidden(state.hidden, site.name);
+      save({ hidden: state.hidden });
+      catalogChanged();
+    });
   }
+
+  row.append(name, url, meta, action);
+  return row;
+}
+
+/** Adding from the manager takes an address, exactly like typing one. */
+function addFromManager(event) {
+  event.preventDefault();
+  const text = els.managerAdd.value.trim();
+  if (!text) return;
+  const url = looksLikeUrl(text) ? toDirectUrl(text) : null;
+  if (!url || !siteNameFromUrl(url)) {
+    els.managerAdd.setCustomValidity("Type an address, like vadkul.se");
+    els.managerAdd.reportValidity();
+    return;
+  }
+  els.managerAdd.setCustomValidity("");
+  state.custom = addCustomSite(state.custom, url);
+  save({ custom: state.custom });
+  els.managerAdd.value = "";
+  catalogChanged();
 }
 
 function save(values) {
@@ -309,7 +419,7 @@ function save(values) {
 
 /** The catalog with this person's own addresses folded in and their habits applied. */
 function personalise(sites) {
-  return applyVisits(mergeCustomSites(sites, state.custom), state.visits);
+  return applyVisits(applyHidden(mergeCustomSites(sites, state.custom), state.hidden), state.visits);
 }
 
 /**
@@ -398,7 +508,7 @@ function claimFocus() {
 
   // Anything already interactive keeps its own tap — stealing focus here would
   // break clicking a suggestion.
-  const INTERACTIVE = "a, button, input, textarea, select, #suggestions";
+  const INTERACTIVE = "a, button, input, textarea, select, #suggestions, .settings, .modal";
   document.addEventListener(
     "pointerdown",
     (event) => {
@@ -410,6 +520,7 @@ function claimFocus() {
 
   document.addEventListener("keydown", (event) => {
     if (event.target === els.input) return;
+    if (event.target instanceof Element && event.target.closest("input, textarea, select")) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.key.length !== 1) return; // ignore Tab, arrows, F-keys and friends
     focus();
@@ -707,7 +818,15 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+/**
+ * While paused (leading space), every suggestion also carries a ✕ that removes
+ * it — a typed-in site is deleted, a catalog one is hidden. The cross only
+ * exists in the paused state: it is a pruning tool, and pruning is what the
+ * calm mode is for. At full speed the rows navigate and nothing competes with
+ * that.
+ */
 function renderSuggestions(candidates) {
+  const paused = /^\s/.test(els.input.value);
   els.suggestions.replaceChildren(
     ...candidates.map(({ site }) => {
       const li = document.createElement("li");
@@ -719,6 +838,27 @@ function renderSuggestions(candidates) {
       url.textContent = destinationOf(site);
       li.append(name, url);
       li.addEventListener("click", () => navigateTo(destinationOf(site)));
+
+      if (paused) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "s-remove";
+        remove.textContent = "✕";
+        remove.setAttribute("aria-label", `Remove ${site.name}`);
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (site.name in state.custom) {
+            state.custom = removeCustomSite(state.custom, site.name);
+            save({ custom: state.custom });
+          } else {
+            state.hidden = toggleHidden(state.hidden, site.name);
+            save({ hidden: state.hidden });
+          }
+          state.sites = personalise(state.baseSites);
+          onInput(); // re-rank what is left; still paused, so crosses stay
+        });
+        li.append(remove);
+      }
       return li;
     })
   );

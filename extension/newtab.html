@@ -57,7 +57,40 @@
           <input type="checkbox" id="setting-yours" />
           <span>List your sites under an empty bar</span>
         </label>
-        <div class="setting-sites" id="setting-sites"></div>
+        <button class="setting-manage" id="open-manager" type="button">
+          Manage sites…
+        </button>
+      </div>
+
+      <div class="modal" id="site-manager" hidden role="dialog" aria-modal="true" aria-label="Manage sites">
+        <div class="modal-panel">
+          <div class="modal-head">
+            <strong>Sites</strong>
+            <span class="modal-count" id="manager-count"></span>
+            <button class="modal-close" id="manager-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <form class="modal-add" id="manager-add-form">
+            <input
+              id="manager-add"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="off"
+              placeholder="Add a site by address — vadkul.se"
+            />
+            <button type="submit">Add</button>
+          </form>
+          <input
+            class="modal-filter"
+            id="manager-filter"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="off"
+            placeholder="Filter…"
+          />
+          <div class="modal-list" id="manager-list"></div>
+        </div>
       </div>
     </main>
 

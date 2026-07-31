@@ -145,6 +145,26 @@ export function addCustomSite(custom, url) {
   return { ...custom, [name]: { name, url, weight: TYPED_SITE_WEIGHT } };
 }
 
+/**
+ * Sites hidden from the catalog by hand.
+ *
+ * The seed list is a guess about everyone, and any guess about everyone is
+ * wrong somewhere: a site you never use is not just dead weight, it competes
+ * for your two-letter prefixes. Hiding is a plain name list — reversible,
+ * inspectable, and applied as a filter so the underlying catalog is untouched.
+ */
+export function toggleHidden(hidden = [], name) {
+  if (!name) return hidden;
+  return hidden.includes(name) ? hidden.filter((n) => n !== name) : [...hidden, name];
+}
+
+/** The catalog without the sites this person has hidden. */
+export function applyHidden(sites, hidden) {
+  if (!hidden || hidden.length === 0) return sites;
+  const gone = new Set(hidden);
+  return sites.filter((site) => !gone.has(site.name));
+}
+
 /** A copy with a remembered address forgotten. */
 export function removeCustomSite(custom, name) {
   if (!custom || !(name in custom)) return custom;
