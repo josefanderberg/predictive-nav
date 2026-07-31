@@ -134,6 +134,7 @@ async function init() {
   // must keep working (Enter falls back to search on an empty catalog).
   els.input.addEventListener("input", onInput);
   els.input.addEventListener("keydown", onKeyDown);
+  window.addEventListener("pageshow", onPageShow);
   claimFocus();
   if (DEMO_MODE) setStatus("Demo mode: navigation is simulated.");
   renderDiagnostics();
@@ -155,6 +156,29 @@ async function init() {
 }
 
 /**
+ * Coming back with the Back button often serves this page frozen from the
+ * back-forward cache rather than reloading it: the old query still in the
+ * field, the ghost completion drawn over the placeholder — the "two
+ * placeholders" look. None of that mid-thought state is worth keeping, because
+ * returning to a launcher means you want to launch something else. So the bar
+ * resets to blank, and the return is fed to the same learning path a fresh
+ * back-navigation load takes — a cache restore never re-runs init, so without
+ * this the Back signal on such browsers was simply lost.
+ */
+async function onPageShow(event) {
+  if (!event.persisted) return;
+  cancelPendingCommit();
+  hideBanner();
+  els.input.value = "";
+  render(null);
+  await learnFromLastVisit("back_forward");
+  state.sites = personalise(state.baseSites);
+  renderSuggestions(yourSites());
+  renderDiagnostics();
+  els.input.focus({ preventScroll: true });
+}
+
+/**
  * If the last guess was answered with the Back button, remember not to make it
  * again for that query.
  *
@@ -162,7 +186,7 @@ async function init() {
  * Failures are silent by design: a browser without extension storage still
  * gets a working bar, just one that cannot learn.
  */
-async function learnFromLastVisit() {
+async function learnFromLastVisit(howOverride) {
   const local = state.store;
   if (!local || local.kind === "none") return;
 
@@ -183,7 +207,7 @@ async function learnFromLastVisit() {
     state.speed = Number(stored.speed) || 1;
     if (!lastGuess) return;
 
-    const how = navigationType(performance.getEntriesByType("navigation"));
+    const how = howOverride ?? navigationType(performance.getEntriesByType("navigation"));
     if (lastGuess.kind !== "url" && isBounce(lastGuess, how, Date.now())) {
       state.rejections = addRejection(state.rejections, lastGuess.query, lastGuess.name);
       await local.set({ rejections: state.rejections });
