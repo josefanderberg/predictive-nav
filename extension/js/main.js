@@ -819,14 +819,11 @@ function setStatus(text) {
 }
 
 /**
- * While paused (leading space), every suggestion also carries a ✕ that removes
- * it — a typed-in site is deleted, a catalog one is hidden. The cross only
- * exists in the paused state: it is a pruning tool, and pruning is what the
- * calm mode is for. At full speed the rows navigate and nothing competes with
- * that.
+ * Every suggestion carries a ✕ button that removes it — a typed-in site is
+ * deleted, a catalog one is hidden. The button is always visible so the user
+ * can prune sites they rarely visit without having to enter the paused state.
  */
 function renderSuggestions(candidates) {
-  const paused = /^\s/.test(els.input.value);
   els.suggestions.replaceChildren(
     ...candidates.map(({ site }) => {
       const li = document.createElement("li");
@@ -839,26 +836,24 @@ function renderSuggestions(candidates) {
       li.append(name, url);
       li.addEventListener("click", () => navigateTo(destinationOf(site)));
 
-      if (paused) {
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "s-remove";
-        remove.textContent = "✕";
-        remove.setAttribute("aria-label", `Remove ${site.name}`);
-        remove.addEventListener("click", (event) => {
-          event.stopPropagation();
-          if (site.name in state.custom) {
-            state.custom = removeCustomSite(state.custom, site.name);
-            save({ custom: state.custom });
-          } else {
-            state.hidden = toggleHidden(state.hidden, site.name);
-            save({ hidden: state.hidden });
-          }
-          state.sites = personalise(state.baseSites);
-          onInput(); // re-rank what is left; still paused, so crosses stay
-        });
-        li.append(remove);
-      }
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "s-remove";
+      remove.textContent = "✕";
+      remove.setAttribute("aria-label", `Remove ${site.name}`);
+      remove.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (site.name in state.custom) {
+          state.custom = removeCustomSite(state.custom, site.name);
+          save({ custom: state.custom });
+        } else {
+          state.hidden = toggleHidden(state.hidden, site.name);
+          save({ hidden: state.hidden });
+        }
+        state.sites = personalise(state.baseSites);
+        onInput(); // re-rank what is left
+      });
+      li.append(remove);
       return li;
     })
   );
