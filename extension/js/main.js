@@ -32,6 +32,7 @@ import {
   learnedCount,
   trustedSites,
   addCustomSite,
+  removeCustomSite,
   mergeCustomSites,
   siteNameFromUrl,
 } from "./memory.js";
@@ -96,10 +97,14 @@ const els = {
   settings: document.getElementById("settings"),
   speed: document.getElementById("setting-speed"),
   yours: document.getElementById("setting-yours"),
+  counts: document.getElementById("setting-counts"),
+  yourSitesList: document.getElementById("setting-sites"),
 };
 
 const state = {
   sites: [],
+  /** the catalog before personalisation, kept so removals can rebuild it */
+  baseSites: [],
   timer: null,
   suppressed: false,
   intent: null,
@@ -138,11 +143,12 @@ async function init() {
   await learnFromLastVisit();
 
   try {
-    state.sites = personalise(await loadSites());
+    state.baseSites = await loadSites();
   } catch {
     const { SEED_SITES } = await import("./sites.js");
-    state.sites = personalise(SEED_SITES);
+    state.baseSites = SEED_SITES;
   }
+  state.sites = personalise(state.baseSites);
   initSettings();
   renderDiagnostics();
   onInput(); // re-evaluate anything typed while the catalog loaded
@@ -224,7 +230,51 @@ function initSettings() {
 
 function toggleSettings() {
   els.settings.hidden = !els.settings.hidden;
+  if (!els.settings.hidden) renderSettingsPanel();
   renderDiagnostics();
+}
+
+/**
+ * The numbers and the list of typed-in sites, shown where they can be acted
+ * on. A removed site leaves the catalog immediately — the base list is kept
+ * unpersonalised precisely so this rebuild restores it exactly.
+ */
+function renderSettingsPanel() {
+  const yours = learnedCount(state.visits);
+  els.counts.textContent = `${state.sites.length} sites in the catalog · ${yours} learned as yours`;
+
+  const entries = Object.values(state.custom);
+  els.yourSitesList.replaceChildren();
+  if (entries.length === 0) return;
+
+  const heading = document.createElement("p");
+  heading.className = "setting-sites-heading";
+  heading.textContent = "Sites you added";
+  els.yourSitesList.append(heading);
+
+  for (const site of entries) {
+    const row = document.createElement("div");
+    row.className = "setting-site";
+
+    const label = document.createElement("span");
+    label.textContent = site.name;
+    label.title = site.url;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "remove";
+    remove.setAttribute("aria-label", `Remove ${site.name}`);
+    remove.addEventListener("click", () => {
+      state.custom = removeCustomSite(state.custom, site.name);
+      save({ custom: state.custom });
+      state.sites = personalise(state.baseSites);
+      renderSettingsPanel();
+      if (!els.input.value.trim()) renderSuggestions(yourSites());
+    });
+
+    row.append(label, remove);
+    els.yourSitesList.append(row);
+  }
 }
 
 function save(values) {
@@ -352,12 +402,8 @@ function claimFocus() {
  */
 function renderDiagnostics() {
   const isExtension = location.protocol === "chrome-extension:";
-  const yours = learnedCount(state.visits);
-  const added = Object.keys(state.custom).length;
 
   const parts = [];
-  if (added > 0) parts.push(`${added} you added`);
-
   if (DEMO_MODE) parts.push("demo mode — nothing navigates and nothing is remembered");
   else if (!isExtension)
     parts.push("web page — learns your sites here, but the arrival overlay needs the extension");
@@ -365,9 +411,7 @@ function renderDiagnostics() {
   els.diagnostics.replaceChildren();
   els.diagnostics.classList.toggle("error", !isExtension && !DEMO_MODE);
 
-  // Only show a learned count where one can actually be kept: printed in a
-  // context that cannot store anything, "0 yours" reads as "you have none"
-  // rather than "this cannot count".
+  // No storage means no preferences worth opening: show only the context note.
   if (state.store?.kind === "none") {
     els.diagnostics.append(
       document.createTextNode([`${state.sites.length} sites`, ...parts].join(" · "))
@@ -375,27 +419,24 @@ function renderDiagnostics() {
     return;
   }
 
-  // The catalog total is a guess about everyone; the count that matters is how
-  // much has become this person's — and it doubles as the switch for the list,
-  // so controlling it needs no button of its own on a bare page.
-  const count = document.createElement("a");
-  count.href = "#";
-  count.textContent = `${state.sites.length} sites · ${yours} yours`;
-  count.title = "Settings";
-  count.addEventListener("click", (event) => {
+  // The numbers live inside the panel; the page itself just offers the word.
+  const link = document.createElement("a");
+  link.href = "#";
+  link.textContent = els.settings.hidden ? "settings" : "close settings";
+  link.addEventListener("click", (event) => {
     event.preventDefault();
     toggleSettings();
   });
-  els.diagnostics.append(count);
+  els.diagnostics.append(link);
   if (parts.length > 0) els.diagnostics.append(document.createTextNode(` · ${parts.join(" · ")}`));
 
   if (!DEMO_MODE) return;
   const real = new URL(location.href);
   real.searchParams.delete("demo");
-  const link = document.createElement("a");
-  link.href = real.href;
-  link.textContent = "turn demo off";
-  els.diagnostics.append(document.createTextNode(" · "), link);
+  const demoOff = document.createElement("a");
+  demoOff.href = real.href;
+  demoOff.textContent = "turn demo off";
+  els.diagnostics.append(document.createTextNode(" · "), demoOff);
 }
 
 /**

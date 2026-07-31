@@ -260,6 +260,55 @@ kbd {
   padding: 0.25rem 0.45rem;
 }
 
+.setting-counts {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.setting-sites {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: stretch;
+  min-width: min(320px, 80vw);
+}
+
+.setting-sites-heading {
+  margin: 0.3rem 0 0.1rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.setting-site {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.setting-site button {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+
+.setting-site button:hover {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
 .diagnostics.error {
   color: #ffb454;
   opacity: 1;
